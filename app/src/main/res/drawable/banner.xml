@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0E0D10"
+        android:pathData="M0,0h320v180h-320z" />
+    <!-- Film frame with a play triangle -->
+    <path
+        android:fillColor="#F5C451"
+        android:pathData="M48,62h56a8,8 0 0 1 8,8v40a8,8 0 0 1 -8,8h-56a8,8 0 0 1 -8,-8v-40a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="#0E0D10"
+        android:pathData="M68,76l22,14l-22,14z" />
+    <!-- "SINE" -->
+    <group android:translateX="138" android:translateY="0">
+        <path
+            android:pathData="M32,72H14a9,9 0 0 0 0,18h12a9,9 0 0 1 0,18H6M48,72V108M64,108V72L90,108V72M126,72H104V108H126M104,90H121"
+            android:strokeWidth="8"
+            android:strokeColor="#F4F1EA"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>
