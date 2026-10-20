@@ -27,11 +27,12 @@ import com.sine.player.data.ResumeMode
 import com.sine.player.source.Storage
 
 @Composable
-fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit = {}, onLibrary: () -> Unit = {}) {
+fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit = {}, onLibrary: () -> Unit = {}, onBackups: () -> Unit = {}) {
     val s = SineApp.instance.settings
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
     var fileAccess by remember { mutableStateOf(Storage.hasFileAccess(context)) }
+    var castOn by remember { mutableStateOf(s.castReceiver) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { fileAccess = Storage.hasFileAccess(context) }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
@@ -284,6 +285,42 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit
                 })
             }
 
+            item {
+                SettingRow("Picture-in-picture", "Pressing Home keeps the video playing in a corner (if the TV supports it)", onOff(s.pictureInPicture), {
+                    s.pictureInPicture = !s.pictureInPicture
+                })
+            }
+
+            item { SectionTitle("Casting") }
+            item {
+                SettingRow(
+                    "Receive from phones",
+                    "Sine shows up as a DLNA \"play to\" screen in apps like BubbleUPnP, Web Video Caster and NAS apps",
+                    onOff(castOn),
+                    {
+                        castOn = !castOn
+                        s.castReceiver = castOn
+                        if (castOn) com.sine.player.cast.CastReceiverService.start(context) else com.sine.player.cast.CastReceiverService.stop(context)
+                    },
+                )
+            }
+            if (castOn && !com.sine.player.cast.CastReceiverService.canOpenFromBackground(context)) {
+                item {
+                    SettingRow(
+                        "Start playback from a phone",
+                        "Android needs \"Display over other apps\" for Sine to open the player when it's in the background",
+                        "Not allowed",
+                        {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}")),
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+
             item { SectionTitle("Library") }
             item {
                 SettingRow(
@@ -307,6 +344,11 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit
                 SettingRow("Show hidden files", "Files and folders starting with a dot", onOff(s.showHiddenFiles), {
                     s.showHiddenFiles = !s.showHiddenFiles
                 })
+            }
+
+            item { SectionTitle("Backup") }
+            item {
+                SettingRow("Back up and restore", "Settings, servers, profiles, button map, resume points, library folders", "", onBackups)
             }
 
             item { SectionTitle("About") }

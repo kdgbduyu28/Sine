@@ -187,6 +187,9 @@ class PlayerSession(
         return engine?.setPicture(value.brightness, value.contrast, value.saturation, value.gamma) ?: false
     }
 
+    /** While true the player is a small corner window: no controls, panels or notices. */
+    var inPictureInPicture by mutableStateOf(false)
+
     /** The SurfaceView Media3 renders into, for screenshots. */
     var surfaceView: android.view.SurfaceView? = null
 

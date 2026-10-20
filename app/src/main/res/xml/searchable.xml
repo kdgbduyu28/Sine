@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV global search / Assistant: results come from search.SearchProvider. -->
+<searchable xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/app_name"
+    android:hint="@string/app_name"
+    android:searchSettingsDescription="@string/app_name"
+    android:includeInGlobalSearch="true"
+    android:searchSuggestAuthority="com.sine.player.search"
+    android:searchSuggestIntentAction="android.intent.action.VIEW"
+    android:searchSuggestSelection=" ?"
+    android:searchSuggestThreshold="2" />

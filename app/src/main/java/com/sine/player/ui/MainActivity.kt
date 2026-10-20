@@ -34,9 +34,13 @@ class MainActivity : ComponentActivity() {
     /** Set when the music notification or "Now playing" card opens the app. */
     private var openMusic by mutableStateOf(false)
 
+    /** A screen asked for from outside: global search results, the remote's search key. */
+    private var pendingRoute by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         openMusic = intent?.getBooleanExtra(EXTRA_OPEN_MUSIC, false) == true
+        handleExternal(intent)
         setContent {
             SineTheme {
                 Box(Modifier.fillMaxSize().background(SineColors.background)) {
@@ -53,6 +57,12 @@ class MainActivity : ComponentActivity() {
                     }
                     val openPhotos: (String, String?) -> Unit = { folder, start ->
                         nav.navigate("photos?folder=${Uri.encode(folder)}&start=${Uri.encode(start.orEmpty())}")
+                    }
+                    LaunchedEffect(pendingRoute) {
+                        pendingRoute?.let { route ->
+                            pendingRoute = null
+                            nav.navigate(route) { launchSingleTop = true }
+                        }
                     }
                     LaunchedEffect(openMusic) {
                         if (openMusic) {
@@ -96,8 +106,18 @@ class MainActivity : ComponentActivity() {
                                 onLibrary = { nav.navigate("library/${it.name}") },
                                 onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
                                 onShow = { nav.navigate("show/${Uri.encode(it)}") },
+                                onSearch = { nav.navigate("search?q=") },
                             )
                         }
+                        composable("search?q={q}") { entry ->
+                            com.sine.player.search.SearchScreen(
+                                initialQuery = entry.arguments?.getString("q").orEmpty(),
+                                onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
+                                onShow = { nav.navigate("show/${Uri.encode(it)}") },
+                                onPlay = play,
+                            )
+                        }
+                        composable("backups") { com.sine.player.backup.BackupScreen() }
                         composable("browse/{uri}") { entry ->
                             val uri = Uri.decode(entry.arguments?.getString("uri").orEmpty())
                             BrowseScreen(
@@ -142,6 +162,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenSubtitles = { nav.navigate("opensubtitles") },
                                 onRemoteButtons = { nav.navigate("remote") },
                                 onLibrary = { nav.navigate("library/settings") },
+                                onBackups = { nav.navigate("backups") },
                             )
                         }
                         composable("remote") { RemoteButtonsScreen() }
@@ -170,6 +191,36 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_MUSIC, false)) openMusic = true
+        handleExternal(intent)
+    }
+
+    /** Global search sends ACTION_SEARCH (typed) or a result's sine:// link. */
+    private fun handleExternal(intent: Intent?) {
+        intent ?: return
+        if (intent.action == Intent.ACTION_SEARCH) {
+            pendingRoute = "search?q=${Uri.encode(intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty())}"
+            return
+        }
+        val link = intent.data?.takeIf { it.scheme == "sine" } ?: return
+        when (link.host) {
+            "play" -> startActivity(Intent(Intent.ACTION_VIEW, link, this, PlayerActivity::class.java))
+            "open" -> {
+                val key = link.getQueryParameter("key") ?: return
+                pendingRoute = when (link.getQueryParameter("type")) {
+                    "movie" -> "movie/${Uri.encode(key)}"
+                    "show" -> "show/${Uri.encode(key)}"
+                    else -> null
+                }
+            }
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_SEARCH) {
+            pendingRoute = "search?q="
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     companion object {

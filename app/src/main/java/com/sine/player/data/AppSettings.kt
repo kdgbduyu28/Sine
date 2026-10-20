@@ -92,6 +92,8 @@ class AppSettings(context: Context) {
     var nightMode by pref("night_mode", false)
     var dialogueBoost by pref("dialogue_boost", false)
     var seekPreviews by pref("seek_previews", true)
+    var castReceiver by pref("cast_receiver", false)
+    var pictureInPicture by pref("picture_in_picture", true)
     var tmdbApiKey by pref("tmdb_api_key", "")
     var launcherRow by pref("launcher_row", true)
     var traktClientId by pref("trakt_client_id", "")

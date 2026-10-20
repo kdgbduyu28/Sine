@@ -83,6 +83,7 @@ class SineApp : Application() {
         keyMap = com.sine.player.data.KeyMap(this)
         household = Household(this)
         runCatching { household.start() }
+        if (settings.castReceiver) runCatching { com.sine.player.cast.CastReceiverService.start(this) }
     }
 
     companion object {

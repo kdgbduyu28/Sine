@@ -63,6 +63,38 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
             }
         }
         openFromIntent(intent)
+        com.sine.player.cast.CastBridge.target = castTarget
+    }
+
+    /** Lets a phone casting to Sine (DLNA) control and follow this player. */
+    private val castTarget = object : com.sine.player.cast.CastTarget {
+        override val uri get() = session.current?.uri
+        override val positionMs get() = session.positionMs
+        override val durationMs get() = session.durationMs
+        override val playing get() = session.isPlaying
+        override fun play() = session.play()
+        override fun pause() = session.pause()
+        override fun stop() = finishWithResult()
+        override fun seek(ms: Long) = session.seekTo(ms)
+    }
+
+    /** Home pressed while a video plays: keep it going in a corner window (where the TV allows it). */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        enterPip()
+    }
+
+    private fun enterPip() {
+        if (!SineApp.instance.settings.pictureInPicture || !session.isPlaying) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+        val size = session.videoFormat?.let { android.util.Rational(it.width.coerceAtLeast(1), it.height.coerceAtLeast(1)) }
+            ?.takeIf { it.toFloat() in 0.42f..2.38f } ?: android.util.Rational(16, 9)
+        runCatching { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().setAspectRatio(size).build()) }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        session.inPictureInPicture = isInPictureInPictureMode
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -367,10 +399,12 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     override fun onStop() {
         super.onStop()
         session.saveProgress()
+        // Closing the picture-in-picture window stops the activity; a plain PiP keeps playing.
         session.pause()
     }
 
     override fun onDestroy() {
+        if (com.sine.player.cast.CastBridge.target === castTarget) com.sine.player.cast.CastBridge.target = null
         Downloads.cleanup()
         SineApp.instance.household.nowPlaying = null
         SineApp.instance.household.control = null

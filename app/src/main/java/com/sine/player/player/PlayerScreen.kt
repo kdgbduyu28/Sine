@@ -116,6 +116,12 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
     val swallowUp = remember { mutableSetOf<Key>() }
     val screenshotContext = LocalContext.current
     val screenshotScope = rememberCoroutineScope()
+    LaunchedEffect(session.inPictureInPicture) {
+        if (session.inPictureInPicture) {
+            overlay = false
+            panel = null
+        }
+    }
 
     fun showOverlay() {
         overlay = true
@@ -263,7 +269,7 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             SeekThumbnail(session, Modifier.align(Alignment.BottomCenter).padding(bottom = 190.dp))
         }
 
-        if (panel == null && !overlay) {
+        if (panel == null && !overlay && !session.inPictureInPicture) {
             SkipButton(session, Modifier.align(Alignment.BottomEnd))
         }
 

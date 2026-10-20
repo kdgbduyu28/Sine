@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.SdStorage
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Usb
@@ -78,6 +79,7 @@ fun HomeScreen(
     onOtherTvs: () -> Unit = {},
     onPlayFrom: (uri: String, title: String?, folder: String?, positionMs: Long, followPeer: String?) -> Unit = { _, _, _, _, _ -> },
     onLibrary: (com.sine.player.library.LibraryKind) -> Unit = {},
+    onSearch: () -> Unit = {},
     onMovie: (String) -> Unit = {},
     onShow: (String) -> Unit = {},
 ) {
@@ -410,6 +412,7 @@ fun HomeScreen(
                             onClick = onDownloads,
                         )
                     }
+                    item { Tile("Search", "Movies, shows, episodes", Icons.Filled.Search, onClick = onSearch) }
                     item {
                         Tile("What this TV can play", "Dolby Vision, HDR, passthrough", Icons.Filled.Memory, onClick = onCapabilities, width = 280)
                     }
