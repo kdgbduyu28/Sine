@@ -162,9 +162,8 @@ private class SineRenderersFactory(
             @Suppress("DEPRECATION")
             builder.setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
         }
-        if (options.nightMode || options.dialogueBoost) {
-            builder.setAudioProcessors(arrayOf(AudioBoostProcessor(options.nightMode, options.dialogueBoost)))
-        }
+        // Always present on decoded audio: night mode, dialogue boost and the volume boost all live here.
+        builder.setAudioProcessors(arrayOf(AudioBoostProcessor(options.nightMode, options.dialogueBoost)))
         return builder.build()
     }
 

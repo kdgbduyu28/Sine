@@ -712,6 +712,14 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 }
                 item {
                     StepperRow(
+                        "Volume boost",
+                        "${session.volumeBoost}%",
+                        hint = if (settings.passthrough && !settings.nightMode && !settings.dialogueBoost) "Not for Dolby/DTS sent to a receiver (passthrough)" else "For quiet files; a limiter stops harsh clipping",
+                        onStep = { d, _ -> session.setVolumeBoost(session.volumeBoost + d * 10) },
+                    )
+                }
+                item {
+                    StepperRow(
                         "Sync for ${session.audioOutput.label}",
                         Time.formatDelay(session.outputDelayMs),
                         hint = "Applies to everything played through it",

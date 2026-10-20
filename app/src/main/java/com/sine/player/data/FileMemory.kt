@@ -36,6 +36,7 @@ data class FileChoices(
     val subtitlesOff: Boolean = false,
     val subtitleDelayMs: Long = 0,
     val audioDelayMs: Long = 0,
+    val volumeBoost: Int = 100,
     val aspect: AspectMode? = null,
     val speed: Float = 1f,
     /** "MEDIA3" / "MPV" when switched by hand. */
@@ -47,6 +48,7 @@ data class FileChoices(
         .put("subOff", subtitlesOff)
         .put("delay", subtitleDelayMs)
         .put("adelay", audioDelayMs)
+        .put("boost", volumeBoost)
         .put("aspect", aspect?.name ?: "")
         .put("speed", speed.toDouble())
         .put("engine", engine ?: "")
@@ -58,6 +60,7 @@ data class FileChoices(
             subtitlesOff = o.optBoolean("subOff"),
             subtitleDelayMs = o.optLong("delay"),
             audioDelayMs = o.optLong("adelay"),
+            volumeBoost = o.optInt("boost", 100),
             aspect = AspectMode.entries.firstOrNull { it.name == o.optString("aspect") },
             speed = o.optDouble("speed", 1.0).toFloat(),
             engine = o.optString("engine").ifEmpty { null },

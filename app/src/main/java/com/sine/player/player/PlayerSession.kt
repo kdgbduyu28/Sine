@@ -148,6 +148,16 @@ class PlayerSession(
         remember { it.copy(audioDelayMs = audioDelayMs) }
     }
 
+    /** 100 = as recorded; up to 200 for quiet files. */
+    var volumeBoost by mutableIntStateOf(100)
+        private set
+
+    fun setVolumeBoost(percent: Int) {
+        volumeBoost = percent.coerceIn(100, 200)
+        engine?.setVolumeBoost(volumeBoost)
+        remember { it.copy(volumeBoost = volumeBoost) }
+    }
+
     /** Where sound is going now, and its own sync offset (applies to every file on that output). */
     var audioOutput by mutableStateOf(AudioOutputs.current(com.sine.player.SineApp.instance))
         private set
@@ -420,6 +430,7 @@ class PlayerSession(
         (p as? ExoPlayer)?.addAnalyticsListener(analytics)
         built.setSubtitleDelay(subtitleDelayMs)
         built.setAudioDelay(totalAudioDelayMs)
+        built.setVolumeBoost(volumeBoost)
         if (picture != Picture()) built.setPicture(picture.brightness, picture.contrast, picture.saturation, picture.gamma)
         built.applySubtitleStyle(settings.subtitleScale, settings.subtitleBottom, settings.subtitleBackground)
         p.setMediaItems(items.map(::toMediaItem), index, positionMs)
@@ -783,6 +794,7 @@ class PlayerSession(
             }
             if (saved.subtitleDelayMs != 0L) setSubtitleDelay(saved.subtitleDelayMs)
             if (saved.audioDelayMs != 0L) setAudioDelay(saved.audioDelayMs)
+            if (saved.volumeBoost != 100) setVolumeBoost(saved.volumeBoost)
             saved.aspect?.let { aspect = it }
             if (saved.speed != 1f) setPlaybackSpeed(saved.speed)
         } finally {

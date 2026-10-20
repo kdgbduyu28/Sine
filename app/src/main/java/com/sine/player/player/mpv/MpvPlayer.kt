@@ -98,6 +98,7 @@ class MpvPlayer(
             if (options.buffer.mpvSeconds > 0) put("cache-secs", options.buffer.mpvSeconds.toString())
             put("demuxer-max-back-bytes", "${32 * 1024 * 1024}")
             put("keep-open", "yes")
+            put("volume-max", "200")
             put("idle", "yes")
             put("force-window", "no")
             put("input-default-bindings", "no")
@@ -560,6 +561,10 @@ class MpvPlayer(
         }
     }
 
+    fun setVolumeBoost(percent: Int) {
+        runCatching { mpv?.setPropertyInt("volume", percent.coerceIn(100, 200)) }
+    }
+
     fun setAudioDelay(ms: Long) {
         mpv?.setPropertyDouble("audio-delay", ms / 1000.0)
     }
@@ -671,6 +676,8 @@ class MpvEngine(private val mpv: MpvPlayer, private val resolve: (String) -> Str
     override fun applySubtitleColors(color: SubtitleColor, edge: SubtitleEdge, boxed: Boolean) = mpv.applySubtitleColors(color, edge, boxed)
 
     override fun setAudioDelay(ms: Long) = mpv.setAudioDelay(ms)
+
+    override fun setVolumeBoost(percent: Int) = mpv.setVolumeBoost(percent)
 
     override fun setPicture(brightness: Int, contrast: Int, saturation: Int, gamma: Int): Boolean {
         mpv.setPicture(brightness, contrast, saturation, gamma)

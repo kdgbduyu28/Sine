@@ -22,8 +22,9 @@ class AudioBoostProcessor(private val nightMode: Boolean, private val dialogueBo
     private var release = 0.0
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
-        if (!nightMode && !(dialogueBoost && inputAudioFormat.channelCount >= 6)) return AudioProcessor.AudioFormat.NOT_SET
+        // Anything but 16-bit PCM (bitstreamed Dolby/DTS, float output) passes by untouched.
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) return AudioProcessor.AudioFormat.NOT_SET
+        // Otherwise always active, so the volume boost can change while playing.
         attack = exp(-1.0 / (inputAudioFormat.sampleRate * 0.005))
         release = exp(-1.0 / (inputAudioFormat.sampleRate * 0.25))
         return inputAudioFormat
@@ -52,7 +53,12 @@ class AudioBoostProcessor(private val nightMode: Boolean, private val dialogueBo
                 val gain = compressorGain(envelope)
                 for (c in 0 until channels) frame[c] = (frame[c] * gain).toInt()
             }
-            for (c in 0 until channels) out.putShort(clip(frame[c]))
+            val boost = VolumeBoost.gain
+            if (boost != 1f) {
+                for (c in 0 until channels) out.putShort(softClip(frame[c] * boost))
+            } else {
+                for (c in 0 until channels) out.putShort(clip(frame[c]))
+            }
             p += channels * 2
         }
         input.position(end)
@@ -77,9 +83,25 @@ class AudioBoostProcessor(private val nightMode: Boolean, private val dialogueBo
         /** Soft-ish clip to 16-bit. */
         fun clip(value: Int): Short = value.coerceIn(-32768, 32767).toShort()
 
+        /** Linear up to about -1 dBFS, then a smooth curve towards full scale instead of hard clipping. */
+        fun softClip(value: Float): Short {
+            val knee = 29_000f
+            val x = kotlin.math.abs(value)
+            if (x <= knee) return value.toInt().toShort()
+            val headroom = 32_767f - knee
+            val over = (x - knee) / headroom
+            val shaped = knee + headroom * (over / (1f + over))
+            return (if (value < 0) -shaped else shaped).toInt().toShort()
+        }
+
         /** The mpv equivalent of night mode (mpv's own decoders, ffmpeg filter). */
         const val MPV_NIGHT_FILTER = "lavfi=[acompressor=threshold=0.125:ratio=4:attack=5:release=250:makeup=2]"
     }
+}
+
+/** Volume boost for Media3 (1.0 = off, up to 2.0), read by [AudioBoostProcessor] on every buffer. */
+object VolumeBoost {
+    @Volatile var gain = 1f
 }
 
 /**

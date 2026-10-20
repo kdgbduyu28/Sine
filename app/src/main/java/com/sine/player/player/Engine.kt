@@ -59,6 +59,9 @@ interface Engine {
     /** Saves the current video frame; null when the engine can't (Media3 uses PixelCopy instead). */
     fun screenshot(path: String): Boolean = false
 
+    /** 100–200 %; louder than the file for quiet recordings. */
+    fun setVolumeBoost(percent: Int) = Unit
+
     /** Polled by the session; null when the engine reports through listeners instead. */
     fun stats(): EngineStats? = null
 
@@ -69,6 +72,10 @@ interface Engine {
 class Media3Engine(val exo: ExoPlayer) : Engine {
     override val kind = EngineKind.MEDIA3
     override val player: Player get() = exo
+
+    override fun setVolumeBoost(percent: Int) {
+        VolumeBoost.gain = percent.coerceIn(100, 200) / 100f
+    }
 }
 
 object MpvSupport {
