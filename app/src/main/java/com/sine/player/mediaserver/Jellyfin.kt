@@ -119,6 +119,7 @@ class JellyfinClient(private val server: RemoteServer, private val deviceId: Str
                 title = o.optString("Name").ifEmpty { "No information" },
                 subtitle = o.optString("EpisodeTitle").ifEmpty { null },
                 description = o.optString("Overview").ifEmpty { null },
+                id = o.optString("Id").ifEmpty { null },
             )
         }
     }
@@ -143,6 +144,19 @@ class JellyfinClient(private val server: RemoteServer, private val deviceId: Str
             append("&api_key=${enc(server.token)}")
         }
         return url to liveStreamId
+    }
+
+    /** Asks the server to record [programId] with its default padding; returns the timer id if it can be found. */
+    fun createTimer(programId: String): String? {
+        val defaults = get("/LiveTv/Timers/Defaults?programId=${enc(programId)}")
+        Net.execute(request("/LiveTv/Timers").post(defaults.toString().toRequestBody(JSON)).build()).close()
+        // The create call returns no body; look the timer up by programme.
+        val timers = get("/LiveTv/Timers").optJSONArray("Items") ?: return null
+        return (0 until timers.length()).map { timers.getJSONObject(it) }.firstOrNull { it.optString("ProgramId") == programId }?.optString("Id")?.ifEmpty { null }
+    }
+
+    fun cancelTimer(timerId: String) {
+        Net.execute(request("/LiveTv/Timers/${enc(timerId)}").delete().build()).close()
     }
 
     fun closeLiveStream(liveStreamId: String) {

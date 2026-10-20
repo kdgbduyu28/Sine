@@ -76,6 +76,12 @@ class LiveTv(private val context: Context) {
         return if (i >= 0) list[i] to list.getOrNull(i + 1) else null to list.firstOrNull { it.startMs > now }
     }
 
+    /** The replay URL for a past programme, when its channel has catch-up. */
+    fun catchUpUrl(channel: Channel, programme: Programme, now: Long = System.currentTimeMillis()): String? {
+        val catchup = channel.catchup?.takeIf { it.covers(programme, now) } ?: return null
+        return catchup.urlFor(channel.url, programme, now)
+    }
+
     fun addSource(source: LiveSource) {
         sources = sources.filter { it.id != source.id } + source
         saveSources()
@@ -102,7 +108,8 @@ class LiveTv(private val context: Context) {
     /** Re-reads every source and guide; keeps what worked if some fail. */
     suspend fun refresh() = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        val from = now - 2 * 3_600_000L
+        // A day back, for catch-up.
+        val from = now - 24 * 3_600_000L
         val to = now + 26 * 3_600_000L
         val allChannels = mutableListOf<Channel>()
         val allGuide = mutableMapOf<String, MutableList<Programme>>()
@@ -213,11 +220,12 @@ class LiveTv(private val context: Context) {
             JSONObject().put("id", c.id).put("name", c.name).put("number", c.number ?: "").put("group", c.group ?: "")
                 .put("logo", c.logo ?: "").put("url", c.url).put("guideId", c.guideId ?: "").put("source", c.sourceId)
                 .put("headers", JSONObject(c.headers))
+                .put("catchup", c.catchup?.let { JSONObject().put("mode", it.mode).put("days", it.days).put("source", it.source ?: "") })
         }))
         val g = JSONObject()
         guide.forEach { (id, list) ->
             g.put(id, JSONArray(list.map { p ->
-                JSONObject().put("s", p.startMs).put("e", p.endMs).put("t", p.title).put("st", p.subtitle ?: "").put("d", p.description ?: "")
+                JSONObject().put("s", p.startMs).put("e", p.endMs).put("t", p.title).put("st", p.subtitle ?: "").put("d", p.description ?: "").put("id", p.id ?: "")
             }))
         }
         root.put("guide", g)
@@ -235,16 +243,17 @@ class LiveTv(private val context: Context) {
                 o.getString("id"), o.getString("name"), o.optString("number").ifEmpty { null }, o.optString("group").ifEmpty { null },
                 o.optString("logo").ifEmpty { null }, o.getString("url"), o.optString("guideId").ifEmpty { null }, o.getString("source"),
                 o.optJSONObject("headers")?.let { h -> h.keys().asSequence().associateWith { h.getString(it) } }.orEmpty(),
+                o.optJSONObject("catchup")?.let { CatchUp(it.getString("mode"), it.optInt("days", 1), it.optString("source").ifEmpty { null }) },
             )
         }
         registerHeaders()
         val g = root.optJSONObject("guide") ?: return
-        val cutoff = System.currentTimeMillis() - 3_600_000L
+        val cutoff = System.currentTimeMillis() - 24 * 3_600_000L
         guide = g.keys().asSequence().associateWith { id ->
             val list = g.getJSONArray(id)
             (0 until list.length()).map { i ->
                 val o = list.getJSONObject(i)
-                Programme(id, o.getLong("s"), o.getLong("e"), o.getString("t"), o.optString("st").ifEmpty { null }, o.optString("d").ifEmpty { null })
+                Programme(id, o.getLong("s"), o.getLong("e"), o.getString("t"), o.optString("st").ifEmpty { null }, o.optString("d").ifEmpty { null }, o.optString("id").ifEmpty { null })
             }.filter { it.endMs > cutoff }
         }
     }

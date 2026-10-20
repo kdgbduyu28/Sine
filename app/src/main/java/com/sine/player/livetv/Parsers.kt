@@ -20,6 +20,8 @@ data class Channel(
     val sourceId: String,
     /** Headers the provider requires (User-Agent, Referer…), from `url|…` or #EXTVLCOPT. */
     val headers: Map<String, String> = emptyMap(),
+    /** Replay of past programmes, when the provider offers it. */
+    val catchup: CatchUp? = null,
 )
 
 data class Programme(
@@ -29,6 +31,8 @@ data class Programme(
     val title: String,
     val subtitle: String? = null,
     val description: String? = null,
+    /** The server's programme id (Jellyfin/Emby), needed to schedule a server recording. */
+    val id: String? = null,
 ) {
     fun isOn(now: Long) = now in startMs until endMs
 }
@@ -41,6 +45,7 @@ object M3u {
 
     fun parse(text: String, sourceId: String): M3uPlaylist {
         var guideUrl: String? = null
+        var playlistDefaults: Map<String, String> = emptyMap()
         val channels = mutableListOf<Channel>()
         var info: String? = null
         var group: String? = null
@@ -51,6 +56,7 @@ object M3u {
                 line.startsWith("#EXTM3U") -> {
                     val attrs = attribute.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
                     guideUrl = (attrs["url-tvg"] ?: attrs["x-tvg-url"])?.split(',')?.firstOrNull()?.trim()?.ifEmpty { null }
+                    playlistDefaults = attrs
                 }
                 line.startsWith("#EXTINF") -> info = line
                 line.startsWith("#EXTGRP:") -> group = line.substringAfter(':').trim()
@@ -83,6 +89,7 @@ object M3u {
                         guideId = guideId,
                         sourceId = sourceId,
                         headers = vlcOptions + kodiHeaders,
+                        catchup = CatchUp.from(attrs, playlistDefaults),
                     )
                     info = null
                     group = null

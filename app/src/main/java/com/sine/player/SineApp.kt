@@ -42,6 +42,8 @@ class SineApp : Application() {
         private set
     lateinit var liveTv: com.sine.player.livetv.LiveTv
         private set
+    lateinit var recordings: com.sine.player.livetv.Recordings
+        private set
     lateinit var downloads: DownloadStore
         private set
     lateinit var profiles: Profiles
@@ -85,6 +87,8 @@ class SineApp : Application() {
         }
         keyMap = com.sine.player.data.KeyMap(this)
         liveTv = com.sine.player.livetv.LiveTv(this)
+        recordings = com.sine.player.livetv.Recordings(this)
+        runCatching { recordings.rearm() }
         household = Household(this)
         runCatching { household.start() }
         if (settings.castReceiver) runCatching { com.sine.player.cast.CastReceiverService.start(this) }

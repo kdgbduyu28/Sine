@@ -120,7 +120,14 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("backups") { com.sine.player.backup.BackupScreen() }
                         composable("about") { com.sine.player.diagnostics.AboutScreen() }
-                        composable("livetv") { com.sine.player.livetv.LiveTvScreen(onPlay = play, onSources = { nav.navigate("livetv/sources") }) }
+                        composable("livetv") {
+                            com.sine.player.livetv.LiveTvScreen(
+                                onPlay = play,
+                                onSources = { nav.navigate("livetv/sources") },
+                                onRecordings = { nav.navigate("livetv/recordings") },
+                            )
+                        }
+                        composable("livetv/recordings") { com.sine.player.livetv.RecordingsScreen(onPlay = play) }
                         composable("livetv/sources") { com.sine.player.livetv.LiveTvSourcesScreen() }
                         composable("browse/{uri}") { entry ->
                             val uri = Uri.decode(entry.arguments?.getString("uri").orEmpty())

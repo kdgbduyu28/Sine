@@ -58,7 +58,11 @@ private enum class LiveView { CHANNELS, GUIDE }
  * the visible list as its playlist, so channel up/down (next/previous) zaps through it.
  */
 @Composable
-fun LiveTvScreen(onPlay: (uri: String, title: String?, folder: String?) -> Unit, onSources: () -> Unit) {
+fun LiveTvScreen(
+    onPlay: (uri: String, title: String?, folder: String?) -> Unit,
+    onSources: () -> Unit,
+    onRecordings: () -> Unit = {},
+) {
     val live = LiveTv.instance
     val scope = rememberCoroutineScope()
     var view by remember { mutableStateOf(LiveView.CHANNELS) }
@@ -83,6 +87,7 @@ fun LiveTvScreen(onPlay: (uri: String, title: String?, folder: String?) -> Unit,
         else -> live.channels
     }
     val folder = LiveTv.folderFor(group, favouritesOnly)
+    var message by remember { mutableStateOf<String?>(null) }
     val play: (Channel) -> Unit = { channel ->
         live.lastChannel = channel.id
         onPlay(LiveTv.uriFor(channel), channel.name, folder)
@@ -94,6 +99,7 @@ fun LiveTvScreen(onPlay: (uri: String, title: String?, folder: String?) -> Unit,
             FilterChip(selected = view == LiveView.GUIDE, onClick = { view = LiveView.GUIDE }) { Text("Guide") }
             Box(Modifier.width(16.dp))
             Button(onClick = onSources) { Text("Sources") }
+            Button(onClick = onRecordings) { Text("Recordings") }
             Button(onClick = {
                 scope.launch {
                     refreshing = true
@@ -119,7 +125,14 @@ fun LiveTvScreen(onPlay: (uri: String, title: String?, folder: String?) -> Unit,
         }
         when (view) {
             LiveView.CHANNELS -> ChannelList(live, channels, now, play)
-            LiveView.GUIDE -> Guide(live, channels, now, play)
+            LiveView.GUIDE -> {
+                Text(
+                    message ?: "OK: watch · hold OK: record · scroll left on ↺ channels for catch-up",
+                    color = if (message != null) SineColors.accent else SineColors.muted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Guide(live, channels, now, play, playUrl = { url, title -> onPlay(url, title, null) }, onMessage = { message = it })
+            }
         }
     }
 }
@@ -170,9 +183,22 @@ private fun ChannelList(live: LiveTv, channels: List<Channel>, now: Long, play: 
 private const val DP_PER_MINUTE = 6
 private const val GUIDE_HOURS = 4
 
-/** Rows of channels, programmes laid out by time for the next few hours. */
+/**
+ * Rows of channels, programmes laid out by time. Each row opens on what's on now; channels with
+ * catch-up can be scrolled back a day. OK on a past programme replays it (catch-up), OK on a
+ * current or future one tunes the channel, and holding OK schedules or cancels a recording.
+ */
 @Composable
-private fun Guide(live: LiveTv, channels: List<Channel>, now: Long, play: (Channel) -> Unit) {
+private fun Guide(
+    live: LiveTv,
+    channels: List<Channel>,
+    now: Long,
+    play: (Channel) -> Unit,
+    playUrl: (url: String, title: String) -> Unit,
+    onMessage: (String) -> Unit,
+) {
+    val recordings = com.sine.player.SineApp.instance.recordings
+    val scope = rememberCoroutineScope()
     val windowStart = now / 1_800_000 * 1_800_000
     val windowEnd = windowStart + GUIDE_HOURS * 3_600_000L
     var focused by remember { mutableStateOf<Programme?>(null) }
@@ -188,19 +214,62 @@ private fun Guide(live: LiveTv, channels: List<Channel>, now: Long, play: (Chann
             items(channels, key = { it.id }) { channel ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        listOfNotNull(channel.number, channel.name).joinToString(" "),
+                        listOfNotNull(channel.number, channel.name).joinToString(" ") + if (channel.catchup != null) " ↺" else "",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.width(160.dp).padding(end = 8.dp),
                     )
-                    val programmes = live.guide[channel.id].orEmpty().filter { it.endMs > windowStart && it.startMs < windowEnd }
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    val rowStart = if (channel.catchup != null) now - 24 * 3_600_000L else windowStart
+                    val programmes = live.guide[channel.id].orEmpty().filter { it.endMs > rowStart && it.startMs < windowEnd }
+                    val firstNow = programmes.indexOfFirst { it.endMs > now }.coerceAtLeast(0)
+                    LazyRow(
+                        state = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = firstNow),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
                         if (programmes.isEmpty()) {
-                            item { Cell("No guide information", (GUIDE_HOURS * 60 * DP_PER_MINUTE), false, onFocus = { focused = null }) { play(channel) } }
+                            item { Cell("No guide information", (GUIDE_HOURS * 60 * DP_PER_MINUTE), live = false, past = false, recording = false, onFocus = { focused = null }, onClick = { play(channel) }) }
                         }
                         items(programmes, key = { it.startMs }) { p ->
-                            val minutes = ((minOf(p.endMs, windowEnd) - maxOf(p.startMs, windowStart)) / 60_000).toInt().coerceAtLeast(5)
-                            Cell(p.title, minutes * DP_PER_MINUTE, p.isOn(now), onFocus = { focused = p }) { play(channel) }
+                            val minutes = ((minOf(p.endMs, windowEnd) - maxOf(p.startMs, rowStart)) / 60_000).toInt().coerceIn(5, 240)
+                            val past = p.endMs <= now
+                            Cell(
+                                p.title,
+                                minutes * DP_PER_MINUTE,
+                                live = p.isOn(now),
+                                past = past,
+                                recording = recordings.isScheduled(channel.id, p),
+                                onFocus = { focused = p },
+                                onClick = {
+                                    if (!past) {
+                                        play(channel)
+                                    } else {
+                                        live.catchUpUrl(channel, p, now)?.let { url -> playUrl(url, "${channel.name} · ${p.title}") }
+                                            ?: onMessage("No catch-up for this channel or programme")
+                                    }
+                                },
+                                onLongClick = {
+                                    if (past) {
+                                        onMessage("This programme has finished")
+                                    } else {
+                                        scope.launch {
+                                            val existing = recordings.list.firstOrNull {
+                                                it.channelId == channel.id && it.startMs == p.startMs &&
+                                                    it.state in setOf(RecordingState.SCHEDULED, RecordingState.RECORDING)
+                                            }
+                                            onMessage(
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                    if (existing != null) {
+                                                        recordings.cancel(existing.id)
+                                                        "Cancelled recording of ${p.title}"
+                                                    } else {
+                                                        recordings.schedule(channel, p)
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
+                                },
+                            )
                         }
                     }
                 }
@@ -210,17 +279,41 @@ private fun Guide(live: LiveTv, channels: List<Channel>, now: Long, play: (Chann
 }
 
 @Composable
-private fun Cell(title: String, widthDp: Int, live: Boolean, onFocus: () -> Unit, onClick: () -> Unit) {
+private fun Cell(
+    title: String,
+    widthDp: Int,
+    live: Boolean,
+    past: Boolean,
+    recording: Boolean,
+    onFocus: () -> Unit,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+) {
     Surface(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = Modifier.width(widthDp.dp).height(48.dp).onFocusGained(onFocus),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(6.dp)),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (live) SineColors.accent.copy(alpha = 0.18f) else SineColors.surface,
+            containerColor = when {
+                live -> SineColors.accent.copy(alpha = 0.18f)
+                past -> SineColors.surface.copy(alpha = 0.5f)
+                else -> SineColors.surface
+            },
             focusedContainerColor = SineColors.accent,
         ),
     ) {
-        Text(title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(6.dp).clip(RoundedCornerShape(4.dp)))
+        Row(Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (recording) Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(androidx.compose.ui.graphics.Color(0xFFE5484D)))
+            if (recording) Box(Modifier.width(6.dp))
+            Text(
+                title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (past) SineColors.muted else androidx.compose.ui.graphics.Color.Unspecified,
+            )
+        }
     }
 }
 
