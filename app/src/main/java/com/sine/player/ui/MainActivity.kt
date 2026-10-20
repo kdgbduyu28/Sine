@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
                                 onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
                                 onShow = { nav.navigate("show/${Uri.encode(it)}") },
                                 onSearch = { nav.navigate("search?q=") },
+                                onLiveTv = { nav.navigate("livetv") },
                             )
                         }
                         composable("search?q={q}") { entry ->
@@ -119,6 +120,8 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("backups") { com.sine.player.backup.BackupScreen() }
                         composable("about") { com.sine.player.diagnostics.AboutScreen() }
+                        composable("livetv") { com.sine.player.livetv.LiveTvScreen(onPlay = play, onSources = { nav.navigate("livetv/sources") }) }
+                        composable("livetv/sources") { com.sine.player.livetv.LiveTvSourcesScreen() }
                         composable("browse/{uri}") { entry ->
                             val uri = Uri.decode(entry.arguments?.getString("uri").orEmpty())
                             BrowseScreen(

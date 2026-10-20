@@ -215,6 +215,13 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     }
 
     override fun onItemReady(item: PlayItem) {
+        SineApp.instance.liveTv.channelFor(item.uri)?.let { channel ->
+            // Live channel: say what's on instead of looking for chapters.
+            SineApp.instance.liveTv.lastChannel = channel.id
+            val (now, next) = SineApp.instance.liveTv.nowAndNext(channel.id)
+            session.notice = listOfNotNull(listOfNotNull(channel.number, channel.name).joinToString(" "), now?.title, next?.let { "next: ${it.title}" }).joinToString(" · ")
+            return
+        }
         lifecycleScope.launch {
             val chapters = withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { MkvChapters.read(this@PlayerActivity, item.playUri) }.getOrDefault(emptyList()) }
             val segments = withContext(kotlinx.coroutines.Dispatchers.IO) { SineApp.instance.mediaServers.segments(item.uri) }
@@ -422,7 +429,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         private const val KIDS_TICK_SECONDS = 10
 
         /** Schemes whose items have to be looked up to get a playable stream. */
-        private val lookupSchemes = setOf("jellyfin", "emby", "plex", "dlna")
+        private val lookupSchemes = setOf("jellyfin", "emby", "plex", "dlna", com.sine.player.livetv.LiveTv.SCHEME)
 
         fun intent(context: Context, uri: String, title: String?, folderUri: String?, positionMs: Long? = null, followPeer: String? = null): Intent =
             Intent(context, PlayerActivity::class.java)

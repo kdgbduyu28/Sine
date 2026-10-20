@@ -65,6 +65,7 @@ object Browsers {
                 "sftp" -> app.sftp.list(parsed, showHidden)
                 "nfs" -> app.nfs.list(parsed, showHidden)
                 "dlna" -> listDlna(parsed)
+                com.sine.player.livetv.LiveTv.SCHEME -> app.liveTv.entries(parsed)
                 in MediaServerUris.schemes -> app.mediaServers.list(uri)
                 else -> error("Browsing $scheme is not supported yet")
             }
@@ -80,6 +81,7 @@ object Browsers {
         val parsed = Uri.parse(uri)
         when (parsed.scheme) {
             in MediaServerUris.schemes -> SineApp.instance.mediaServers.resolve(uri)
+            com.sine.player.livetv.LiveTv.SCHEME -> SineApp.instance.liveTv.resolve(uri)
             "dlna" -> {
                 val segments = parsed.pathSegments
                 if (segments.size < 3 || segments[1] != "i") return@withContext null
@@ -105,6 +107,7 @@ object Browsers {
         when (parsed.scheme) {
             in MediaServerUris.schemes -> SineApp.instance.mediaServers.serverFor(uri)?.let { return it.displayName }
             "dlna" -> return "DLNA servers"
+            com.sine.player.livetv.LiveTv.SCHEME -> return parsed.getQueryParameter("group") ?: "Live TV"
         }
         return parsed.lastPathSegment ?: parsed.host ?: uri
     }
