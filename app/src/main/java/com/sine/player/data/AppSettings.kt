@@ -22,6 +22,18 @@ enum class EngineMode(val label: String, val description: String) {
     MEDIA3("Media3 only", "Never switch to mpv automatically"),
 }
 
+enum class DownloadWhen(val label: String, val description: String) {
+    NOW("Right away", "Start downloading as soon as something is queued"),
+    OVERNIGHT("Overnight", "Wait until 1 AM and stop starting new files after 6 AM"),
+}
+
+enum class AutoDelete(val label: String, val days: Int?) {
+    NEVER("Never", null),
+    WATCHED("When watched", 0),
+    DAY("1 day after watching", 1),
+    WEEK("7 days after watching", 7),
+}
+
 enum class MpvOutput(val label: String, val description: String) {
     GPU("GPU", "mpv draws video and subtitles itself. Works everywhere; HDR is tone-mapped to SDR."),
     DIRECT("Direct", "Hardware decoder renders straight to the screen, keeping HDR. mpv can't draw subtitles in this mode."),
@@ -54,6 +66,9 @@ class AppSettings(context: Context) {
     var photoKenBurns by pref("photo_ken_burns", true)
     var photoShuffle by pref("photo_shuffle", false)
     var screensaverFolder by pref("screensaver_folder", "")
+    var downloadTarget by pref("download_target", "")
+    var downloadWhen by enumPref("download_when", DownloadWhen.NOW)
+    var downloadAutoDelete by enumPref("download_auto_delete", AutoDelete.NEVER)
     private var storedDeviceId by pref("device_id", "")
 
     /** Stable id that media servers use to tell this TV apart from other clients. */

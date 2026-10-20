@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.coil.compose)
     implementation(libs.coil.core)
+    implementation(libs.work.runtime)
 
     implementation(libs.smbj)
     implementation(libs.libmpv)

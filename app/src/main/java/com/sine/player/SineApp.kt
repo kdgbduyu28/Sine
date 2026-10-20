@@ -6,6 +6,8 @@ import com.sine.player.data.AppSettings
 import com.sine.player.data.RemoteServers
 import com.sine.player.data.ResumeStore
 import com.sine.player.data.SmbServers
+import com.sine.player.downloads.DownloadStore
+import com.sine.player.downloads.Downloads
 import com.sine.player.mediaserver.MediaServers
 import com.sine.player.net.Dlna
 import com.sine.player.net.NfsConnections
@@ -35,6 +37,8 @@ class SineApp : Application() {
         private set
     lateinit var mediaServers: MediaServers
         private set
+    lateinit var downloads: DownloadStore
+        private set
 
     /** Lets mpv read every source Sine can; started on first use. */
     val streamProxy: StreamProxy by lazy { StreamProxy(SchemeDataSource.Factory(this)) }
@@ -51,6 +55,9 @@ class SineApp : Application() {
         nfs = NfsConnections { remoteServers.servers.toList() }
         dlna = Dlna(this)
         mediaServers = MediaServers(remoteServers, resume) { settings.deviceId() }
+        downloads = DownloadStore(File(filesDir, "downloads.json"))
+        Downloads.cleanup()
+        if (downloads.nextQueued() != null) Downloads.schedule(this)
     }
 
     companion object {

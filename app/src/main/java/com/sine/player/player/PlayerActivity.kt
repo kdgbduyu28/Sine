@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import com.sine.player.SineApp
+import com.sine.player.downloads.Downloads
 import com.sine.player.mediaserver.ProgressState
 import com.sine.player.player.mpv.MpvEngine
 import com.sine.player.player.mpv.MpvPlayer
@@ -81,8 +82,8 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         val externalSubs = externalSubtitles(intent)
         val needsLookup = Uri.parse(uri).scheme in lookupSchemes
 
-        if (folder == null && !needsLookup) {
-            session.start(listOf(PlayItem(uri, title, null, externalSubs)), 0, startPosition)
+        if (folder == null && (!needsLookup || Downloads.store.finished(uri) != null)) {
+            session.start(listOf(Downloads.localize(PlayItem(uri, title, null, externalSubs))), 0, startPosition)
             return
         }
         lifecycleScope.launch {
@@ -98,7 +99,8 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
                 // Plex folder listings leave out subtitle streams; fetch them for the item being opened.
                 runCatching { Browsers.resolve(uri) }.getOrNull()?.let { full -> queue[start] = toPlayItem(full, folder) }
             }
-            session.start(queue, start, startPosition)
+            // Downloaded copies play from local storage, even when the source is offline.
+            session.start(queue.map(Downloads::localize), start, startPosition)
         }
     }
 
@@ -241,6 +243,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     }
 
     override fun onDestroy() {
+        Downloads.cleanup()
         handler.removeCallbacksAndMessages(null)
         displayListener?.let { (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).unregisterDisplayListener(it) }
         session.releasePlayer()

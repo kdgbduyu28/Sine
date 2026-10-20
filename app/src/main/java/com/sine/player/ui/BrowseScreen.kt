@@ -36,7 +36,9 @@ import com.sine.player.source.MediaEntry
 import com.sine.player.source.MediaFiles
 import com.sine.player.ui.theme.SineColors
 import com.sine.player.util.Time
+import com.sine.player.downloads.Downloads
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun BrowseScreen(
@@ -96,8 +98,10 @@ fun BrowseScreen(
             else -> LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 itemsIndexed(list, key = { _, entry -> entry.uri }) { index, entry ->
                     val record = remember(entry.uri, resumeVersion) { if (entry.isVideo) resume.get(entry.uri) else null }
+                    val downloaded = remember(entry.uri, SineApp.instance.downloads.items) { SineApp.instance.downloads.finished(entry.uri) != null }
                     val detail = when {
                         entry.isDirectory -> null
+                        downloaded && record?.watched != true -> "Downloaded · ${MediaFiles.formatSize(entry.size)}"
                         record?.watched == true -> "Watched · ${MediaFiles.formatSize(entry.size)}"
                         record?.resumable == true -> "${Time.remaining(record.durationMs - record.positionMs)} · ${MediaFiles.formatSize(entry.size)}"
                         else -> MediaFiles.formatSize(entry.size)
@@ -167,9 +171,20 @@ private fun entryActions(
     notify: (String) -> Unit,
 ): List<MenuAction> {
     val app = SineApp.instance
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun download(block: suspend () -> String) {
+        scope.launch { notify(runCatching { block() }.getOrElse { "Couldn't queue the download: ${it.message}" }) }
+    }
     return buildList {
         when {
             entry.isDirectory -> {
+                add(MenuAction("Download all videos", "This folder only") {
+                    download { "${Downloads.enqueueFolder(context, entry.uri, includeSubfolders = false)} videos added to Downloads" }
+                })
+                add(MenuAction("Download all videos and sub-folders", "Good for a whole show with season folders") {
+                    download { "${Downloads.enqueueFolder(context, entry.uri, includeSubfolders = true)} videos added to Downloads" }
+                })
                 add(MenuAction("Play music in this folder") { onPlayMusic(entry.uri, null) })
                 add(MenuAction("Photo slideshow") { onOpenPhotos(entry.uri, null) })
                 add(MenuAction("Use as screensaver", "Photos from this folder and its sub-folders") {
@@ -179,6 +194,14 @@ private fun entryActions(
             }
             entry.isVideo -> {
                 add(MenuAction("Play") { onPlay(entry.uri, entry.title, folder) })
+                val existing = app.downloads.items.firstOrNull { it.sourceUri == entry.uri }
+                if (existing == null) {
+                    add(MenuAction("Download", "Keep a copy on this TV to watch offline") {
+                        download { if (Downloads.enqueueVideo(context, entry, folder)) "Added to Downloads" else "Already in Downloads" }
+                    })
+                } else {
+                    add(MenuAction("Remove download", "Deletes the copy on this TV") { Downloads.delete(existing.id) })
+                }
                 val record = app.resume.get(entry.uri)
                 if (record?.watched == true || record?.resumable == true) {
                     add(MenuAction("Mark as unwatched") { app.resume.forget(entry.uri) })

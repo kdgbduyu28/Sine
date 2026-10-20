@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sine.player.data.ServerKind
+import com.sine.player.downloads.DownloadsScreen
 import com.sine.player.music.MusicRemote
 import com.sine.player.music.MusicScreen
 import com.sine.player.photos.PhotoViewerScreen
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                                 onSettings = { nav.navigate("settings") },
                                 onCapabilities = { nav.navigate("capabilities") },
                                 onMusic = { nav.navigate("music") { launchSingleTop = true } },
+                                onDownloads = { nav.navigate("downloads") },
                             )
                         }
                         composable("browse/{uri}") { entry ->
@@ -82,6 +84,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("music") { MusicScreen() }
+                        composable("downloads") { DownloadsScreen(onPlay = play) }
                         composable("photos?folder={folder}&start={start}") { entry ->
                             PhotoViewerScreen(
                                 folder = entry.arguments?.getString("folder").orEmpty(),

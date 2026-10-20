@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Router
@@ -70,6 +71,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onCapabilities: () -> Unit,
     onMusic: () -> Unit = {},
+    onDownloads: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = SineApp.instance
@@ -243,6 +245,20 @@ fun HomeScreen(
             item { SectionTitle("More") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    item {
+                        val downloads = app.downloads.items
+                        val running = downloads.count { it.status != com.sine.player.downloads.DownloadStatus.DONE }
+                        Tile(
+                            "Downloads",
+                            when {
+                                downloads.isEmpty() -> "Watch offline"
+                                running > 0 -> "$running in progress · ${downloads.size - running} ready"
+                                else -> "${downloads.size} ready offline"
+                            },
+                            Icons.Filled.DownloadForOffline,
+                            onClick = onDownloads,
+                        )
+                    }
                     item {
                         Tile("What this TV can play", "Dolby Vision, HDR, passthrough", Icons.Filled.Memory, onClick = onCapabilities, width = 280)
                     }

@@ -172,6 +172,28 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}) {
                 )
             }
 
+            item { SectionTitle("Downloads") }
+            item {
+                val targets = remember { com.sine.player.downloads.Downloads.targets(context) }
+                val current = targets.firstOrNull { it.dir.path == s.downloadTarget } ?: targets.firstOrNull()
+                SettingRow(
+                    "Save downloads to",
+                    current?.let { "${com.sine.player.source.MediaFiles.formatSize(it.freeBytes)} free. Click to switch between internal storage and USB drives." },
+                    current?.label ?: "Internal storage",
+                    { if (targets.isNotEmpty()) s.downloadTarget = next(targets, current ?: targets.first()).dir.path },
+                )
+            }
+            item {
+                SettingRow("When to download", s.downloadWhen.description, s.downloadWhen.label, {
+                    s.downloadWhen = next(com.sine.player.data.DownloadWhen.entries, s.downloadWhen)
+                })
+            }
+            item {
+                SettingRow("Delete after watching", "Free up space automatically once you've finished a downloaded video", s.downloadAutoDelete.label, {
+                    s.downloadAutoDelete = next(com.sine.player.data.AutoDelete.entries, s.downloadAutoDelete)
+                })
+            }
+
             item { SectionTitle("Files") }
             item {
                 SettingRow(
