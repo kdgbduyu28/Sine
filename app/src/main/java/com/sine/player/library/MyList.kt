@@ -26,8 +26,26 @@ class MyList(context: Context) {
 
     fun toggle(key: String) {
         val now = keys()
-        val updated = if (key in now) now - key else listOf(key) + now
-        prefs.edit { putString(profileKey(), encode(updated)) }
+        val removing = key in now
+        val updated = if (removing) now - key else listOf(key) + now
+        // Removals wait for the next Trakt sync, so the watchlist doesn't bring them back.
+        val removed = pendingRemovals().let { if (removing) it + key else it - key }
+        prefs.edit {
+            putString(profileKey(), encode(updated))
+            putString(profileKey() + "_removed", encode(removed.toList()))
+        }
+        version++
+    }
+
+    fun pendingRemovals(): Set<String> = decode(prefs.getString(profileKey() + "_removed", "").orEmpty()).toSet()
+
+    /** After a Trakt sync: items the watchlist added, and removals that went through. */
+    fun applySync(added: List<String>, removalsDone: Set<String>) {
+        val updated = (added + keys()).distinct()
+        prefs.edit {
+            putString(profileKey(), encode(updated))
+            putString(profileKey() + "_removed", encode((pendingRemovals() - removalsDone).toList()))
+        }
         version++
     }
 
@@ -38,6 +56,22 @@ class MyList(context: Context) {
         fun encode(keys: List<String>) = keys.joinToString("\n")
 
         fun decode(text: String) = text.split('\n').filter { it.isNotBlank() }.distinct()
+    }
+}
+
+/** What a My list ↔ Trakt watchlist sync should do. Keys are My list keys ("movie:…"/"show:…"). */
+data class WatchlistPlan(val addLocally: List<String>, val pushToTrakt: List<String>, val removeFromTrakt: List<String>)
+
+object WatchlistSync {
+    /**
+     * [library] maps each library title's My list key to its TMDB id; [traktKeysPresent] are the
+     * library keys whose TMDB id is on the Trakt watchlist.
+     */
+    fun plan(local: List<String>, pendingRemovals: Set<String>, library: Map<String, Int>, traktKeysPresent: Set<String>): WatchlistPlan {
+        val addLocally = traktKeysPresent.filter { it in library && it !in local && it !in pendingRemovals }
+        val pushToTrakt = local.filter { it in library && it !in traktKeysPresent }
+        val removeFromTrakt = pendingRemovals.filter { it in library && it in traktKeysPresent }
+        return WatchlistPlan(addLocally, pushToTrakt, removeFromTrakt)
     }
 }
 

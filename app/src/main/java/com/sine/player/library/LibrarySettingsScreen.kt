@@ -146,8 +146,10 @@ fun LibrarySettingsScreen() {
                     }
                 } else {
                     item {
-                        SettingRow("Sync watched history", "Both ways, for library movies and episodes matched on TMDB", "Sync", {
-                            scope.launch { toast = runCatching { Trakt.syncWatched() }.getOrElse { "Sync failed: ${it.message}" } }
+                        SettingRow("Sync watched history and watchlist", "Both ways, for library titles matched on TMDB; the watchlist is My list", "Sync", {
+                            scope.launch {
+                                toast = runCatching { Trakt.syncWatched() + " · " + Trakt.syncWatchlist() }.getOrElse { "Sync failed: ${it.message}" }
+                            }
                         })
                     }
                     item {

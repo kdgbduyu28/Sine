@@ -52,7 +52,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - **Recently added** from your servers: the newest movies and episodes on each Jellyfin/Emby/Plex server, newest first.
 - **Home rows:** Next up, Movies, TV shows; poster grids you can sort (recently added, A–Z ignoring "The", newest, top rated) and filter (unwatched, genre), remembered per grid; movie and show pages with resume, start over, watched, seasons, a **Trailer** button (TMDB trailer in the YouTube app) and **More like this** from your own library.
 - **TV launcher:** Continue watching / Play next entries that reopen Sine where you left off.
-- **Trakt:** sign in with your own Trakt API app; scrobbling and two-way watched sync.
+- **Trakt:** sign in with your own Trakt API app; scrobbling, two-way watched sync, and My list synced with your Trakt watchlist (titles in your library).
 
 ## Phase 4: playback extras
 

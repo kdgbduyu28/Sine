@@ -119,6 +119,43 @@ object Trakt {
     }
 
     /** Marks local files watched from Trakt history and sends local watched items Trakt doesn't have. */
+    /** Two-way sync of My list with the Trakt watchlist, for titles in the library (matched by TMDB id). */
+    suspend fun syncWatchlist(): String = withContext(Dispatchers.IO) {
+        if (!connected) return@withContext "Not connected"
+        refreshIfNeeded()
+        val store = Library.store
+        val myList = SineApp.instance.myList
+        // Library keys ("movie:<key>" / "show:<key>") with their TMDB ids.
+        val library = HashMap<String, Int>()
+        store.movies.forEach { m -> store.meta[m.key]?.tmdbId?.let { library[com.sine.player.library.MyList.movieKey(m.key)] = it } }
+        store.shows.forEach { sh -> store.meta[sh.key]?.tmdbId?.let { library[com.sine.player.library.MyList.showKey(sh.key)] = it } }
+        fun ids(path: String, field: String): Set<Int> {
+            val array = Net.jsonArray(request(path).get().build())
+            return (0 until array.length()).mapNotNull { array.getJSONObject(it).optJSONObject(field)?.optJSONObject("ids")?.optInt("tmdb")?.takeIf { id -> id > 0 } }.toSet()
+        }
+        val traktMovies = ids("/sync/watchlist/movies", "movie")
+        val traktShows = ids("/sync/watchlist/shows", "show")
+        val present = library.filter { (k, id) -> if (k.startsWith("movie:")) id in traktMovies else id in traktShows }.keys
+        val plan = com.sine.player.library.WatchlistSync.plan(myList.keys(), myList.pendingRemovals(), library, present)
+        fun body(keys: List<String>): JSONObject {
+            val movies = JSONArray()
+            val shows = JSONArray()
+            keys.forEach { k ->
+                val entry = JSONObject().put("ids", JSONObject().put("tmdb", library.getValue(k)))
+                if (k.startsWith("movie:")) movies.put(entry) else shows.put(entry)
+            }
+            return JSONObject().put("movies", movies).put("shows", shows)
+        }
+        if (plan.pushToTrakt.isNotEmpty()) Net.execute(request("/sync/watchlist").post(body(plan.pushToTrakt).toString().toRequestBody(JSON)).build()).close()
+        if (plan.removeFromTrakt.isNotEmpty()) Net.execute(request("/sync/watchlist/remove").post(body(plan.removeFromTrakt).toString().toRequestBody(JSON)).build()).close()
+        withContext(Dispatchers.Main) {
+            // Removals of titles not on Trakt (or not in the library) are done too.
+            val done = myList.pendingRemovals().filter { it !in present || it in plan.removeFromTrakt }.toSet()
+            myList.applySync(plan.addLocally, done)
+        }
+        "My list: ${plan.addLocally.size} from Trakt, ${plan.pushToTrakt.size} sent, ${plan.removeFromTrakt.size} removed"
+    }
+
     suspend fun syncWatched(): String = withContext(Dispatchers.IO) {
         if (!connected) return@withContext "Not connected"
         refreshIfNeeded()
