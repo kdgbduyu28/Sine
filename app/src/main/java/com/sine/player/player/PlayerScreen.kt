@@ -708,6 +708,14 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                     )
                 }
                 item {
+                    StepperRow(
+                        "Sync for ${session.audioOutput.label}",
+                        Time.formatDelay(session.outputDelayMs),
+                        hint = "Applies to everything played through it",
+                        onStep = { d, repeat -> session.setOutputDelay(session.outputDelayMs + d * if (repeat > 6) 100L else 20L) },
+                    )
+                }
+                item {
                     ChoiceRow("Night mode", "Quieter explosions, clearer speech (turns off passthrough)", settings.nightMode, {
                         settings.nightMode = !settings.nightMode
                         session.switchEngine(session.engineKind, if (settings.nightMode) "Night mode on" else "Night mode off")

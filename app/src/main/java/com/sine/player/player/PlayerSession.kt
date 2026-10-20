@@ -18,6 +18,7 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import com.sine.player.util.Time
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioSink
@@ -143,8 +144,33 @@ class PlayerSession(
 
     fun setAudioDelay(ms: Long) {
         audioDelayMs = ms.coerceIn(-2_000, 2_000)
-        engine?.setAudioDelay(audioDelayMs)
+        engine?.setAudioDelay(totalAudioDelayMs)
         remember { it.copy(audioDelayMs = audioDelayMs) }
+    }
+
+    /** Where sound is going now, and its own sync offset (applies to every file on that output). */
+    var audioOutput by mutableStateOf(AudioOutputs.current(com.sine.player.SineApp.instance))
+        private set
+    var outputDelayMs by mutableLongStateOf(AudioOutputs.delayFor(com.sine.player.SineApp.instance, audioOutput))
+        private set
+
+    /** The file's offset plus the output's. */
+    val totalAudioDelayMs: Long get() = audioDelayMs + outputDelayMs
+
+    fun setOutputDelay(ms: Long) {
+        outputDelayMs = ms.coerceIn(-1_000, 1_000)
+        AudioOutputs.setDelay(com.sine.player.SineApp.instance, audioOutput, outputDelayMs)
+        engine?.setAudioDelay(totalAudioDelayMs)
+    }
+
+    /** Headphones or a soundbar came or went: switch to that output's offset. */
+    fun refreshAudioOutput() {
+        val now = AudioOutputs.current(com.sine.player.SineApp.instance)
+        if (now == audioOutput) return
+        audioOutput = now
+        outputDelayMs = AudioOutputs.delayFor(com.sine.player.SineApp.instance, now)
+        engine?.setAudioDelay(totalAudioDelayMs)
+        if (outputDelayMs != 0L) notice = "${now.label}: sync ${Time.formatDelay(outputDelayMs)}"
     }
 
     var chapters by mutableStateOf<List<Chapter>>(emptyList())
@@ -388,12 +414,12 @@ class PlayerSession(
         restoredFor = null
         resetEngineInfo()
         val options = PlayerFactory.options(settings, baseLayerOnly).let { if (toneMapping && kind == EngineKind.MPV) ToneMap.apply(it) else it }
-        val built = host.createEngine(kind, options, { subtitleDelayMs * 1000 }, { audioDelayMs * 1000 })
+        val built = host.createEngine(kind, options, { subtitleDelayMs * 1000 }, { totalAudioDelayMs * 1000 })
         val p = built.player
         p.addListener(listener)
         (p as? ExoPlayer)?.addAnalyticsListener(analytics)
         built.setSubtitleDelay(subtitleDelayMs)
-        built.setAudioDelay(audioDelayMs)
+        built.setAudioDelay(totalAudioDelayMs)
         if (picture != Picture()) built.setPicture(picture.brightness, picture.contrast, picture.saturation, picture.gamma)
         built.applySubtitleStyle(settings.subtitleScale, settings.subtitleBottom, settings.subtitleBackground)
         p.setMediaItems(items.map(::toMediaItem), index, positionMs)

@@ -65,7 +65,10 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         }
         openFromIntent(intent)
         com.sine.player.cast.CastBridge.target = castTarget
+        stopWatchingOutputs = com.sine.player.player.AudioOutputs.watch(this) { session.refreshAudioOutput() }
     }
+
+    private var stopWatchingOutputs: () -> Unit = {}
 
     /** Lets a phone casting to Sine (DLNA) control and follow this player. */
     private val castTarget = object : com.sine.player.cast.CastTarget {
@@ -449,6 +452,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     override fun onDestroy() {
         if (com.sine.player.cast.CastBridge.target === castTarget) com.sine.player.cast.CastBridge.target = null
+        stopWatchingOutputs()
         Downloads.cleanup()
         SineApp.instance.household.nowPlaying = null
         SineApp.instance.household.control = null
