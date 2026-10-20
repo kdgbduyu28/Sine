@@ -209,3 +209,18 @@ fun Message(title: String, body: String, modifier: Modifier = Modifier, actions:
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { actions() }
     }
 }
+
+/** A short message that floats at the bottom of a page. */
+@Composable
+fun Toast(message: String, modifier: Modifier = Modifier) {
+    Text(
+        message,
+        style = MaterialTheme.typography.bodyLarge,
+        color = SineColors.text,
+        modifier = modifier
+            .padding(bottom = 32.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(SineColors.surfaceHigh)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+    )
+}

@@ -44,6 +44,12 @@ class ResumeStore(context: Context) {
         version.intValue++
     }
 
+    /** Records a file as finished without playing it (duration unknown, so a nominal one is used). */
+    fun markWatched(uri: String, title: String, folderUri: String?) {
+        val known = get(uri)?.durationMs?.takeIf { it > 0 } ?: 1L
+        save(uri, title, folderUri, known, known)
+    }
+
     fun forget(uri: String) {
         prefs.edit { remove(uri) }
         version.intValue++

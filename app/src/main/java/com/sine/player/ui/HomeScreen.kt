@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Settings
@@ -52,6 +53,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.sine.player.SineApp
+import com.sine.player.music.MusicRemote
 import com.sine.player.data.ServerKind
 import com.sine.player.source.Storage
 import com.sine.player.source.StorageVolume
@@ -67,6 +69,7 @@ fun HomeScreen(
     onAddServer: () -> Unit,
     onSettings: () -> Unit,
     onCapabilities: () -> Unit,
+    onMusic: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = SineApp.instance
@@ -92,7 +95,11 @@ fun HomeScreen(
             onBrowse(it.uri)
         }
     }
-    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    LaunchedEffect(Unit) {
+        runCatching { firstFocus.requestFocus() }
+        // Picks up music that kept playing in the background.
+        runCatching { MusicRemote.connect(context) }
+    }
 
     fun openVolume(volume: StorageVolume) {
         if (hasAccess) {
@@ -120,6 +127,28 @@ fun HomeScreen(
                         color = SineColors.muted,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
+                }
+            }
+
+            if (MusicRemote.hasMedia) {
+                item { SectionTitle("Now playing") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        item {
+                            val meta = MusicRemote.metadata
+                            Tile(
+                                title = meta.title?.toString().orEmpty().ifEmpty { "Music" },
+                                subtitle = listOfNotNull(
+                                    if (MusicRemote.isPlaying) "Playing" else "Paused",
+                                    meta.artist?.toString() ?: meta.albumTitle?.toString(),
+                                ).joinToString(" · "),
+                                icon = Icons.Filled.MusicNote,
+                                width = 300,
+                                onClick = onMusic,
+                                onLongClick = { MusicRemote.stop() },
+                            )
+                        }
+                    }
                 }
             }
 

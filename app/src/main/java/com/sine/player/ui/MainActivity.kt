@@ -1,5 +1,6 @@
 package com.sine.player.ui
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,26 +8,55 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sine.player.data.ServerKind
+import com.sine.player.music.MusicRemote
+import com.sine.player.music.MusicScreen
+import com.sine.player.photos.PhotoViewerScreen
 import com.sine.player.player.PlayerActivity
 import com.sine.player.ui.theme.SineColors
 import com.sine.player.ui.theme.SineTheme
+import kotlinx.coroutines.launch
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
+    /** Set when the music notification or "Now playing" card opens the app. */
+    private var openMusic by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        openMusic = intent?.getBooleanExtra(EXTRA_OPEN_MUSIC, false) == true
         setContent {
             SineTheme {
                 Box(Modifier.fillMaxSize().background(SineColors.background)) {
                     val nav = rememberNavController()
+                    val scope = rememberCoroutineScope()
                     val play: (String, String?, String?) -> Unit = { uri, title, folder ->
                         startActivity(PlayerActivity.intent(this@MainActivity, uri, title, folder))
+                    }
+                    val playMusic: (String, String?) -> Unit = { folder, start ->
+                        scope.launch {
+                            runCatching { MusicRemote.playFolder(this@MainActivity, folder, start.orEmpty()) }
+                            nav.navigate("music") { launchSingleTop = true }
+                        }
+                    }
+                    val openPhotos: (String, String?) -> Unit = { folder, start ->
+                        nav.navigate("photos?folder=${Uri.encode(folder)}&start=${Uri.encode(start.orEmpty())}")
+                    }
+                    LaunchedEffect(openMusic) {
+                        if (openMusic) {
+                            openMusic = false
+                            nav.navigate("music") { launchSingleTop = true }
+                        }
                     }
                     NavHost(navController = nav, startDestination = "home") {
                         composable("home") {
@@ -38,6 +68,7 @@ class MainActivity : ComponentActivity() {
                                 onAddServer = { nav.navigate("addserver") },
                                 onSettings = { nav.navigate("settings") },
                                 onCapabilities = { nav.navigate("capabilities") },
+                                onMusic = { nav.navigate("music") { launchSingleTop = true } },
                             )
                         }
                         composable("browse/{uri}") { entry ->
@@ -46,6 +77,15 @@ class MainActivity : ComponentActivity() {
                                 uri = uri,
                                 onOpenFolder = { nav.navigate("browse/${Uri.encode(it)}") },
                                 onPlay = play,
+                                onPlayMusic = playMusic,
+                                onOpenPhotos = openPhotos,
+                            )
+                        }
+                        composable("music") { MusicScreen() }
+                        composable("photos?folder={folder}&start={start}") { entry ->
+                            PhotoViewerScreen(
+                                folder = entry.arguments?.getString("folder").orEmpty(),
+                                startUri = entry.arguments?.getString("start")?.ifEmpty { null },
                             )
                         }
                         composable("smb?id={id}") { entry ->
@@ -75,5 +115,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_MUSIC, false)) openMusic = true
+    }
+
+    companion object {
+        const val EXTRA_OPEN_MUSIC = "com.sine.player.open_music"
     }
 }

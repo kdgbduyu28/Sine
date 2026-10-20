@@ -151,6 +151,27 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}) {
                 )
             }
 
+            item { SectionTitle("Photos") }
+            item {
+                SettingRow("Slideshow speed", "Seconds each photo stays on screen (also used by the screensaver)", "${s.photoIntervalSeconds} s", {
+                    s.photoIntervalSeconds = next(AppSettings.photoIntervals, s.photoIntervalSeconds)
+                })
+            }
+            item {
+                SettingRow("Slow zoom", "Gentle Ken Burns zoom during slideshows", onOff(s.photoKenBurns), { s.photoKenBurns = !s.photoKenBurns })
+            }
+            item {
+                SettingRow("Shuffle slideshows", "Show a folder's photos in random order", onOff(s.photoShuffle), { s.photoShuffle = !s.photoShuffle })
+            }
+            item {
+                SettingRow(
+                    "Screensaver folder",
+                    if (s.screensaverFolder.isBlank()) "Hold OK on a folder while browsing → Use as screensaver" else "Click to clear. Pick \"Sine photos\" as the TV's screen saver.",
+                    if (s.screensaverFolder.isBlank()) "Not set" else com.sine.player.source.Browsers.displayName(s.screensaverFolder),
+                    { s.screensaverFolder = "" },
+                )
+            }
+
             item { SectionTitle("Files") }
             item {
                 SettingRow(

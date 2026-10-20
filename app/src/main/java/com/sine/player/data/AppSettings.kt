@@ -50,6 +50,10 @@ class AppSettings(context: Context) {
     var openSubtitlesApiKey by pref("opensubtitles_api_key", "")
     var openSubtitlesUser by pref("opensubtitles_user", "")
     var openSubtitlesPassword by pref("opensubtitles_password", "")
+    var photoIntervalSeconds by pref("photo_interval", 8)
+    var photoKenBurns by pref("photo_ken_burns", true)
+    var photoShuffle by pref("photo_shuffle", false)
+    var screensaverFolder by pref("screensaver_folder", "")
     private var storedDeviceId by pref("device_id", "")
 
     /** Stable id that media servers use to tell this TV apart from other clients. */
@@ -115,5 +119,6 @@ class AppSettings(context: Context) {
         val subtitleScales = listOf(0.75f, 0.9f, 1.0f, 1.15f, 1.3f, 1.5f, 1.75f, 2.0f)
         val subtitleBottoms = listOf(0.02f, 0.05f, 0.08f, 0.12f, 0.16f, 0.20f)
         val seekSteps = listOf(5, 10, 15, 30, 60)
+        val photoIntervals = listOf(4, 8, 15, 30, 60)
     }
 }

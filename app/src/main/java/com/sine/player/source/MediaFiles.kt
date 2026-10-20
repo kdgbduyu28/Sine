@@ -10,6 +10,15 @@ object MediaFiles {
 
     val subtitleExtensions = setOf("srt", "ass", "ssa", "vtt", "ttml", "dfxp")
 
+    val audioExtensions = setOf(
+        "mp3", "flac", "m4a", "aac", "ogg", "oga", "opus", "wav", "aif", "aiff", "ape", "wv", "wma", "mka", "dsf", "dff", "alac",
+    )
+
+    val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "bmp", "avif")
+
+    /** File names music players treat as album art, best first. */
+    private val coverNames = listOf("cover", "folder", "front", "album", "albumart", "albumartsmall")
+
     fun extension(name: String): String = name.substringAfterLast('.', "").lowercase()
 
     fun baseName(name: String): String = name.substringBeforeLast('.', name)
@@ -17,6 +26,35 @@ object MediaFiles {
     fun isVideo(name: String) = extension(name) in videoExtensions
 
     fun isSubtitle(name: String) = extension(name) in subtitleExtensions
+
+    fun isAudio(name: String) = extension(name) in audioExtensions
+
+    fun isImage(name: String) = extension(name) in imageExtensions
+
+    /** The folder's album art among [names] (cover.jpg, folder.png, …), if any. */
+    fun findCover(names: List<String>): String? = names
+        .filter { isImage(it) }
+        .minByOrNull { name ->
+            val index = coverNames.indexOf(baseName(name).lowercase())
+            if (index >= 0) index else Int.MAX_VALUE
+        }
+        ?.takeIf { baseName(it).lowercase() in coverNames }
+
+    /** `Song.lrc` next to `Song.flac`. */
+    fun findLyrics(audioName: String, names: List<String>): String? {
+        val base = baseName(audioName)
+        return names.firstOrNull { extension(it) == "lrc" && baseName(it).equals(base, ignoreCase = true) }
+    }
+
+    private val trackPrefix = Regex("""^\s*(?:(?:cd|disc)\s*\d+[\s._-]+)?(\d{1,3})(?:[\s._-]+|\.\s*)(?=\D)""", RegexOption.IGNORE_CASE)
+
+    /** "01 - Clair de Lune.flac" → ("Clair de Lune", 1). Tags from the file replace this once it plays. */
+    fun trackTitle(fileName: String): Pair<String, Int?> {
+        val base = baseName(fileName).trim()
+        val match = trackPrefix.find(base) ?: return base.replace('_', ' ') to null
+        val title = base.substring(match.range.last + 1).trim(' ', '-', '.', '_').replace('_', ' ')
+        return (title.ifEmpty { base }) to match.groupValues[1].toIntOrNull()
+    }
 
     /** A subtitle file sitting next to a video, e.g. `Movie.en.forced.srt` for `Movie.mkv`. */
     data class Sidecar(val fileName: String, val language: String?, val forced: Boolean, val label: String)

@@ -52,3 +52,23 @@ class MediaFilesTest {
         assertEquals("", MediaFiles.formatSize(0))
     }
 }
+
+class MusicFilesTest {
+    @Test
+    fun `cleans track numbers from file names`() {
+        assertEquals("Clair de Lune" to 1, MediaFiles.trackTitle("01 - Clair de Lune.flac"))
+        assertEquals("Intro" to 3, MediaFiles.trackTitle("03. Intro.mp3"))
+        assertEquals("Song Name" to 12, MediaFiles.trackTitle("CD1 12_Song_Name.m4a"))
+        assertEquals("1917" to null, MediaFiles.trackTitle("1917.flac"))
+        assertEquals("2001 A Space Odyssey" to null, MediaFiles.trackTitle("2001 A Space Odyssey.mp3"))
+    }
+
+    @Test
+    fun `finds album art and lyrics`() {
+        val names = listOf("01 - A.flac", "01 - A.lrc", "back.jpg", "Folder.JPG", "cover.png")
+        assertEquals("cover.png", MediaFiles.findCover(names))
+        assertEquals("Folder.JPG", MediaFiles.findCover(names - "cover.png"))
+        assertEquals(null, MediaFiles.findCover(listOf("photo1.jpg")))
+        assertEquals("01 - A.lrc", MediaFiles.findLyrics("01 - A.flac", names))
+    }
+}

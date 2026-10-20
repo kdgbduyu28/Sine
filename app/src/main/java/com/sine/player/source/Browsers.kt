@@ -40,6 +40,8 @@ data class MediaEntry(
 ) {
     val isVideo: Boolean get() = !isDirectory && (playable || MediaFiles.isVideo(name))
     val isSubtitle: Boolean get() = !isDirectory && !playable && MediaFiles.isSubtitle(name)
+    val isAudio: Boolean get() = !isDirectory && !playable && MediaFiles.isAudio(name)
+    val isImage: Boolean get() = !isDirectory && !playable && MediaFiles.isImage(name)
 
     /** Name without the extension for files; server titles are shown as they are. */
     val title: String get() = if (playable) name else MediaFiles.baseName(name)
@@ -89,8 +91,8 @@ object Browsers {
         }
     }
 
-    /** Folders and videos only; subtitles are listed separately so they can attach to videos. */
-    fun visible(entries: List<MediaEntry>) = entries.filter { it.isDirectory || it.isVideo }
+    /** Folders, videos, music and photos; subtitles are listed separately so they can attach to videos. */
+    fun visible(entries: List<MediaEntry>) = entries.filter { it.isDirectory || it.isVideo || it.isAudio || it.isImage }
 
     fun child(parent: String, name: String): String = Uri.parse(parent).buildUpon().appendPath(name).build().toString()
 
