@@ -310,6 +310,7 @@ class PlayerSession(
         if (restoring || !settings.rememberPerFile) return
         val item = current ?: return
         memory?.update(item.uri, change)
+        if (settings.rememberPerFolder) item.folderUri?.let { folder -> memory?.updateFolder(folder, change) }
     }
     var speed by mutableFloatStateOf(1f)
         private set
@@ -659,7 +660,8 @@ class PlayerSession(
         val item = current ?: return
         if (!settings.rememberPerFile || newTracks.groups.isEmpty() || restoredFor == item.uri) return
         restoredFor = item.uri
-        val saved = memory?.get(item.uri) ?: return
+        val folderChoices = if (settings.rememberPerFolder) item.folderUri?.let { memory?.folder(it) } else null
+        val saved = com.sine.player.data.FileMemory.merge(memory?.get(item.uri), folderChoices) ?: return
         restoring = true
         try {
             fun apply(type: Int, choice: com.sine.player.data.TrackChoice) {

@@ -216,6 +216,14 @@ fun SettingsScreen(
                 })
             }
             item {
+                SettingRow(
+                    "Same tracks for the whole season",
+                    "Audio and subtitles picked on one episode apply to the others in its folder, unless an episode has its own",
+                    onOff(s.rememberPerFolder),
+                    { s.rememberPerFolder = !s.rememberPerFolder },
+                )
+            }
+            item {
                 SettingRow("Forget per-file choices", "Clears what Sine remembered for every file", "Clear", {
                     com.sine.player.SineApp.instance.fileMemory.clear()
                 })

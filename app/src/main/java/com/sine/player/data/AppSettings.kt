@@ -93,6 +93,8 @@ class AppSettings(context: Context) {
     private var storedHouseholdCode by pref("household_code", "")
     private var storedDeviceName by pref("device_name", "")
     var rememberPerFile by pref("remember_per_file", true)
+    /** Audio/subtitle picked on one episode applies to the rest of its folder. */
+    var rememberPerFolder by pref("remember_per_folder", true)
     var skipSegments by enumPref("skip_segments", SkipMode.BUTTON)
     var nightMode by pref("night_mode", false)
     var dialogueBoost by pref("dialogue_boost", false)

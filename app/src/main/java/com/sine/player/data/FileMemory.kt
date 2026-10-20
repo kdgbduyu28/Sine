@@ -76,5 +76,32 @@ class FileMemory(context: Context) {
         prefs.edit { putString(uri, updated.toJson().toString()) }
     }
 
+    /** Audio/subtitle choices for a whole folder (a season), used by episodes without their own. */
+    fun folder(folderUri: String): FileChoices? = get(FOLDER_PREFIX + folderUri)
+
+    fun updateFolder(folderUri: String, change: (FileChoices) -> FileChoices) {
+        val updated = tracksOnly(change(folder(folderUri) ?: FileChoices()))
+        prefs.edit { putString(FOLDER_PREFIX + folderUri, updated.toJson().toString()) }
+    }
+
     fun clear() = prefs.edit { clear() }
+
+    companion object {
+        private const val FOLDER_PREFIX = "folder:"
+
+        /** Only the track choices carry over to other files; delays, zoom, speed and engine stay per file. */
+        fun tracksOnly(c: FileChoices) = FileChoices(audio = c.audio, subtitle = c.subtitle, subtitlesOff = c.subtitlesOff)
+
+        /** The file's own choices, with audio and subtitles from the folder where the file has none. */
+        fun merge(file: FileChoices?, folder: FileChoices?): FileChoices? {
+            if (folder == null) return file
+            val base = file ?: FileChoices()
+            val ownSubtitle = base.subtitle != null || base.subtitlesOff
+            return base.copy(
+                audio = base.audio ?: folder.audio,
+                subtitle = if (ownSubtitle) base.subtitle else folder.subtitle,
+                subtitlesOff = if (ownSubtitle) base.subtitlesOff else folder.subtitlesOff,
+            )
+        }
+    }
 }
