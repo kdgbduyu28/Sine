@@ -159,9 +159,9 @@ class PlayerSession(
     }
 
     /** Where sound is going now, and its own sync offset (applies to every file on that output). */
-    var audioOutput by mutableStateOf(AudioOutputs.current(com.sine.player.SineApp.instance))
+    var outputDevice by mutableStateOf(AudioOutputs.current(com.sine.player.SineApp.instance))
         private set
-    var outputDelayMs by mutableLongStateOf(AudioOutputs.delayFor(com.sine.player.SineApp.instance, audioOutput))
+    var outputDelayMs by mutableLongStateOf(AudioOutputs.delayFor(com.sine.player.SineApp.instance, outputDevice))
         private set
 
     /** The file's offset plus the output's. */
@@ -169,15 +169,15 @@ class PlayerSession(
 
     fun setOutputDelay(ms: Long) {
         outputDelayMs = ms.coerceIn(-1_000, 1_000)
-        AudioOutputs.setDelay(com.sine.player.SineApp.instance, audioOutput, outputDelayMs)
+        AudioOutputs.setDelay(com.sine.player.SineApp.instance, outputDevice, outputDelayMs)
         engine?.setAudioDelay(totalAudioDelayMs)
     }
 
     /** Headphones or a soundbar came or went: switch to that output's offset. */
     fun refreshAudioOutput() {
         val now = AudioOutputs.current(com.sine.player.SineApp.instance)
-        if (now == audioOutput) return
-        audioOutput = now
+        if (now == outputDevice) return
+        outputDevice = now
         outputDelayMs = AudioOutputs.delayFor(com.sine.player.SineApp.instance, now)
         engine?.setAudioDelay(totalAudioDelayMs)
         if (outputDelayMs != 0L) notice = "${now.label}: sync ${Time.formatDelay(outputDelayMs)}"

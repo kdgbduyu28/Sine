@@ -720,7 +720,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 }
                 item {
                     StepperRow(
-                        "Sync for ${session.audioOutput.label}",
+                        "Sync for ${session.outputDevice.label}",
                         Time.formatDelay(session.outputDelayMs),
                         hint = "Applies to everything played through it",
                         onStep = { d, repeat -> session.setOutputDelay(session.outputDelayMs + d * if (repeat > 6) 100L else 20L) },
