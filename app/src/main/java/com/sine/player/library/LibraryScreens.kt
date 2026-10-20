@@ -310,13 +310,19 @@ fun MovieDetailScreen(
     onPlay: (uri: String, title: String?, folder: String?, positionMs: Long?) -> Unit,
 ) {
     val store = Library.store
-    val movie = store.movie(key) ?: run {
+    val resume = SineApp.instance.resume
+    resume.version.intValue
+    // The same movie can be in the library more than once (4K remux and 1080p, two cuts…).
+    val versions = store.movies.filter { it.key == key }.distinctBy { it.file.uri }
+    if (versions.isEmpty()) {
         Message("Not in the library", "Rescan the library from Settings → Library.")
         return
     }
+    val versionInfo = remember(versions) { versions.map { Versions.info(it.file.name, it.file.size) } }
+    var movie by remember(versions) {
+        mutableStateOf(versions[Versions.pick(versionInfo, versions.indexOfFirst { resume.get(it.file.uri)?.resumable == true })])
+    }
     val meta = store.meta[key]
-    val resume = SineApp.instance.resume
-    resume.version.intValue
     val record = resume.get(movie.file.uri)
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -336,6 +342,15 @@ fun MovieDetailScreen(
                 color = SineColors.muted,
             )
             Spacer(Modifier.height(20.dp))
+            if (versions.size > 1) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                    items(versions.indices.toList()) { i ->
+                        androidx.tv.material3.FilterChip(selected = versions[i] == movie, onClick = { movie = versions[i] }) {
+                            Text(Versions.label(versionInfo[i]))
+                        }
+                    }
+                }
+            }
             meta?.overview?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = SineColors.text, maxLines = 8, modifier = Modifier.width(720.dp)) }
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
