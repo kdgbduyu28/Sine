@@ -76,6 +76,12 @@ dependencies {
     implementation(libs.media3.ffmpeg)
 
     implementation(libs.smbj)
+    implementation(libs.libmpv)
+    implementation(libs.okhttp)
+    implementation(libs.jsch)
+    implementation(libs.nfs.client)
 
     testImplementation(libs.junit)
+    // Android's org.json is a stub in local unit tests; the real one lets parsers be tested.
+    testImplementation(libs.org.json)
 }

@@ -25,10 +25,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +52,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.sine.player.SineApp
+import com.sine.player.data.ServerKind
 import com.sine.player.source.Storage
 import com.sine.player.source.StorageVolume
 import com.sine.player.ui.theme.SineColors
@@ -60,6 +63,8 @@ fun HomeScreen(
     onBrowse: (String) -> Unit,
     onPlay: (uri: String, title: String?, folder: String?) -> Unit,
     onEditServer: (String?) -> Unit,
+    onEditRemote: (ServerKind, String) -> Unit,
+    onAddServer: () -> Unit,
     onSettings: () -> Unit,
     onCapabilities: () -> Unit,
 ) {
@@ -157,9 +162,18 @@ fun HomeScreen(
                 }
             }
 
-            item { SectionTitle("Network shares") }
+            item { SectionTitle("Network") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    items(app.remoteServers.servers.filter { it.kind.isMediaServer }, key = { it.id }) { server ->
+                        Tile(
+                            title = server.displayName,
+                            subtitle = "${server.kind.label} · hold OK to edit",
+                            icon = Icons.Filled.VideoLibrary,
+                            onClick = { onBrowse(server.rootUri) },
+                            onLongClick = { onEditRemote(server.kind, server.id) },
+                        )
+                    }
                     items(app.smbServers.servers, key = { it.id }) { server ->
                         Tile(
                             title = server.displayName,
@@ -169,12 +183,29 @@ fun HomeScreen(
                             onLongClick = { onEditServer(server.id) },
                         )
                     }
+                    items(app.remoteServers.servers.filter { !it.kind.isMediaServer }, key = { it.id }) { server ->
+                        Tile(
+                            title = server.displayName,
+                            subtitle = "${server.summary} · hold OK to edit",
+                            icon = Icons.Filled.Dns,
+                            onClick = { onBrowse(server.rootUri) },
+                            onLongClick = { onEditRemote(server.kind, server.id) },
+                        )
+                    }
                     item {
                         Tile(
-                            title = "Add SMB share",
-                            subtitle = "NAS, Windows or Mac share",
+                            title = "DLNA / UPnP",
+                            subtitle = "Find media servers on this network",
+                            icon = Icons.Filled.Router,
+                            onClick = { onBrowse("dlna://servers/") },
+                        )
+                    }
+                    item {
+                        Tile(
+                            title = "Add server",
+                            subtitle = "SMB, WebDAV, SFTP, NFS, Jellyfin, Emby, Plex",
                             icon = Icons.Filled.Add,
-                            onClick = { onEditServer(null) },
+                            onClick = onAddServer,
                         )
                     }
                 }

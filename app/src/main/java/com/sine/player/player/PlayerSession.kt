@@ -24,6 +24,8 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.mediacodec.MediaCodecRenderer
 import com.sine.player.data.AppSettings
 import com.sine.player.data.DolbyVisionMode
+import com.sine.player.data.EngineMode
+import com.sine.player.mediaserver.ProgressState
 import com.sine.player.data.ResumeMode
 import com.sine.player.data.ResumeStore
 import com.sine.player.source.MediaFiles
@@ -34,6 +36,8 @@ data class PlayItem(
     val title: String,
     val folderUri: String?,
     val subtitles: List<MediaItem.SubtitleConfiguration> = emptyList(),
+    /** What the engine opens; differs from [uri] for media server streams. [uri] stays the resume key. */
+    val playUri: String = uri,
 )
 
 data class TrackOption(
@@ -44,13 +48,14 @@ data class TrackOption(
     val index: Int,
 )
 
-enum class Panel { AUDIO, SUBTITLES, SUBTITLE_STYLE, VIDEO, INFO }
+enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, VIDEO, INFO }
 
 data class ResumePrompt(val positionMs: Long, val durationMs: Long)
 
 /**
- * Owns the ExoPlayer and everything the player screen shows. Plain Compose state, driven by
- * [PlayerActivity]; it rebuilds the engine when Dolby Vision has to fall back to the base layer.
+ * Owns the playback engine (Media3 or mpv) and everything the player screen shows. Plain Compose
+ * state, driven by [PlayerActivity]; it rebuilds the engine when Dolby Vision has to fall back to
+ * the base layer, and switches to mpv when Media3 can't play a file.
  */
 @UnstableApi
 class PlayerSession(
@@ -59,13 +64,17 @@ class PlayerSession(
     private val resume: ResumeStore,
 ) {
     interface Host {
-        fun createPlayer(options: EngineOptions, subtitleDelayUs: () -> Long): ExoPlayer
+        fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long): Engine
         fun onFrameRate(fps: Float)
         fun onFinished(ended: Boolean)
+        fun onProgress(item: PlayItem, positionMs: Long, durationMs: Long, state: ProgressState) = Unit
     }
 
-    var player by mutableStateOf<ExoPlayer?>(null)
+    var engine by mutableStateOf<Engine?>(null)
         private set
+    val player: Player? get() = engine?.player
+    val engineKind: EngineKind? get() = engine?.kind
+    val canSwitchEngine: Boolean get() = MpvSupport.available
     var items: List<PlayItem> = emptyList()
         private set
     var index by mutableIntStateOf(0)
@@ -124,6 +133,9 @@ class PlayerSession(
     private var frameRateHandledFor: String? = null
     private var ended = false
 
+    /** Set once mpv took over automatically, so a failure there isn't bounced back again. */
+    private var autoSwitched = false
+
     fun start(queue: List<PlayItem>, startIndex: Int, startPositionMs: Long?) {
         items = queue
         index = startIndex.coerceIn(0, queue.lastIndex)
@@ -138,23 +150,56 @@ class PlayerSession(
                 }
             }
         }
-        buildEngine(position)
+        val kind = if (settings.engineMode == EngineMode.MPV && MpvSupport.available) EngineKind.MPV else EngineKind.MEDIA3
+        buildEngine(position, kind)
     }
 
-    private fun buildEngine(positionMs: Long) {
-        player?.release()
-        val exo = host.createPlayer(PlayerFactory.options(settings, baseLayerOnly)) { subtitleDelayMs * 1000 }
-        exo.addListener(listener)
-        exo.addAnalyticsListener(analytics)
-        exo.setMediaItems(items.map(::toMediaItem), index, positionMs)
-        exo.setPlaybackSpeed(speed)
-        exo.prepare()
-        player = exo
+    private fun buildEngine(positionMs: Long, kind: EngineKind) {
+        engine?.release()
+        resetEngineInfo()
+        val options = PlayerFactory.options(settings, baseLayerOnly)
+        val built = host.createEngine(kind, options) { subtitleDelayMs * 1000 }
+        val p = built.player
+        p.addListener(listener)
+        (p as? ExoPlayer)?.addAnalyticsListener(analytics)
+        built.setSubtitleDelay(subtitleDelayMs)
+        built.applySubtitleStyle(settings.subtitleScale, settings.subtitleBottom, settings.subtitleBackground)
+        p.setMediaItems(items.map(::toMediaItem), index, positionMs)
+        p.setPlaybackSpeed(speed)
+        p.prepare()
+        engine = built
         applyPlayWhenReady()
     }
 
+    private fun resetEngineInfo() {
+        videoFormat = null
+        audioFormat = null
+        videoDecoder = null
+        audioDecoder = null
+        audioOutput = null
+        droppedFrames = 0
+        tracks = Tracks.EMPTY
+    }
+
+    /** Rebuilds playback on the other engine at the current position (the Picture/Info panel action). */
+    fun switchEngine(to: EngineKind? = null, reason: String? = null) {
+        val current = engine ?: return
+        val target = to ?: current.kind.other
+        if (target == EngineKind.MPV && !MpvSupport.available) {
+            notice = "mpv needs Android 8.0 or newer."
+            return
+        }
+        val p = current.player
+        val position = p.currentPosition.coerceAtLeast(0)
+        index = p.currentMediaItemIndex.coerceIn(0, items.lastIndex)
+        error = null
+        frameRateHandledFor = null
+        notice = reason ?: "Switched to ${target.label}."
+        buildEngine(position, target)
+    }
+
     private fun toMediaItem(item: PlayItem) = MediaItem.Builder()
-        .setUri(item.uri)
+        .setUri(item.playUri)
         .setMediaId(item.uri)
         .setMediaMetadata(MediaMetadata.Builder().setTitle(item.title).build())
         .setSubtitleConfigurations(item.subtitles)
@@ -232,7 +277,32 @@ class PlayerSession(
 
     fun adjustSubtitleDelay(deltaMs: Long) {
         subtitleDelayMs = if (deltaMs == 0L) 0 else (subtitleDelayMs + deltaMs).coerceIn(-60_000, 60_000)
+        engine?.setSubtitleDelay(subtitleDelayMs)
     }
+
+    /**
+     * Adds a downloaded subtitle to the current item and selects it. mpv takes it live; Media3
+     * needs the item rebuilt, which is done at the current position.
+     */
+    fun addSubtitle(uri: String, label: String, language: String?) {
+        val item = current ?: return
+        val config = MediaItem.SubtitleConfiguration.Builder(Uri.parse(uri))
+            .setId("added:${item.subtitles.size}:$uri")
+            .setMimeType(subtitleMime(uri))
+            .setLanguage(language)
+            .setLabel(label)
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+        items = items.toMutableList().also { it[index] = item.copy(subtitles = item.subtitles + config) }
+        val e = engine ?: return
+        if (!e.addSubtitle(uri, label, language)) {
+            pendingSubtitleId = config.id
+            switchEngine(e.kind, "Added subtitle: $label")
+        }
+    }
+
+    /** Selected once Media3 reports the rebuilt item's tracks. */
+    private var pendingSubtitleId: String? = null
 
     fun answerResume(resumeFromSaved: Boolean) {
         val prompt = resumePrompt ?: return
@@ -286,6 +356,12 @@ class PlayerSession(
     /** Called twice a second by the screen. */
     fun tick() {
         val p = player ?: return
+        engine?.stats()?.let { stats ->
+            videoDecoder = stats.videoDecoder
+            audioDecoder = stats.audioDecoder
+            audioOutput = stats.audioOutput
+            droppedFrames = stats.droppedFrames
+        }
         positionMs = p.currentPosition.coerceAtLeast(0)
         durationMs = p.duration.takeIf { it != C.TIME_UNSET } ?: 0
         bufferedMs = p.bufferedPosition
@@ -297,19 +373,22 @@ class PlayerSession(
         val now = System.currentTimeMillis()
         if (now - lastSavedAt > 10_000 && p.isPlaying) {
             lastSavedAt = now
-            saveProgress()
+            saveProgress(ProgressState.PLAYING)
         }
     }
 
-    fun saveProgress() {
+    fun saveProgress(state: ProgressState = ProgressState.PAUSED) {
         val item = current ?: return
-        if (durationMs > 0) resume.save(item.uri, item.title, item.folderUri, positionMs, durationMs)
+        if (durationMs > 0) {
+            resume.save(item.uri, item.title, item.folderUri, positionMs, durationMs)
+            host.onProgress(item, positionMs, durationMs, state)
+        }
     }
 
     fun releasePlayer() {
-        saveProgress()
-        player?.release()
-        player = null
+        saveProgress(ProgressState.STOPPED)
+        engine?.release()
+        engine = null
     }
 
     private val listener = object : Player.Listener {
@@ -323,7 +402,10 @@ class PlayerSession(
             if (state == Player.STATE_READY) error = null
             if (state == Player.STATE_ENDED && !ended) {
                 ended = true
-                current?.let { resume.save(it.uri, it.title, it.folderUri, durationMs, durationMs) }
+                current?.let {
+                    resume.save(it.uri, it.title, it.folderUri, durationMs, durationMs)
+                    host.onProgress(it, durationMs, durationMs, ProgressState.STOPPED)
+                }
                 host.onFinished(ended = true)
             }
         }
@@ -337,6 +419,7 @@ class PlayerSession(
                     val finished = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
                     val position = if (finished) lastItemDuration else lastItemPosition
                     resume.save(item.uri, item.title, item.folderUri, position, lastItemDuration)
+                    if (lastItemDuration > 0) host.onProgress(item, position, lastItemDuration, ProgressState.STOPPED)
                 }
             }
             index = newIndex
@@ -362,12 +445,14 @@ class PlayerSession(
 
         override fun onTracksChanged(newTracks: Tracks) {
             tracks = newTracks
+            if (maybeSwitchForUnsupportedTracks(newTracks)) return
+            selectPendingSubtitle(newTracks)
             val video = newTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
             val videoIndex = video?.let { g -> (0 until g.length).firstOrNull { g.isTrackSelected(it) } }
             val format = if (video != null && videoIndex != null) video.getTrackFormat(videoIndex) else null
             if (format != null) {
                 if (videoFormat == null) videoFormat = format
-                maybeFallBackToBaseLayer(format, video!!.getTrackSupport(videoIndex!!))
+                if (engineKind == EngineKind.MEDIA3) maybeFallBackToBaseLayer(format, video!!.getTrackSupport(videoIndex!!))
                 val uri = current?.uri
                 if (settings.frameRateMatching && uri != null && frameRateHandledFor != uri && format.frameRate > 0) {
                     frameRateHandledFor = uri
@@ -379,6 +464,10 @@ class PlayerSession(
         }
 
         override fun onPlayerError(e: PlaybackException) {
+            if (engineKind == EngineKind.MPV) {
+                error = "mpv couldn't play this file.\n${e.message.orEmpty()}".trim()
+                return
+            }
             val format = videoFormat
             val decoderFailed = e.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
                 e.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ||
@@ -389,8 +478,39 @@ class PlayerSession(
                 switchToBaseLayer(format)
                 return
             }
+            if (shouldTryMpv(e.errorCode)) {
+                autoSwitch("Media3 can't play this file. Switching to mpv.")
+                return
+            }
             error = describe(e)
         }
+    }
+
+    private fun shouldTryMpv(errorCode: Int): Boolean =
+        engineKind == EngineKind.MEDIA3 && settings.engineMode == EngineMode.AUTO && MpvSupport.available && !autoSwitched &&
+            errorCode in EngineFallback.mpvErrorCodes
+
+    /** Media3 plays a file with no usable video or audio track silently; mpv usually has a decoder. */
+    private fun maybeSwitchForUnsupportedTracks(newTracks: Tracks): Boolean {
+        if (engineKind != EngineKind.MEDIA3 || settings.engineMode != EngineMode.AUTO || !MpvSupport.available || autoSwitched) return false
+        val types = newTracks.groups.map { g -> EngineFallback.GroupSupport(g.type, (0 until g.length).any { g.isTrackSupported(it, true) }) }
+        val missing = EngineFallback.unsupportedType(types) ?: return false
+        autoSwitch("This device can't decode the file's $missing. Switching to mpv.")
+        return true
+    }
+
+    private fun autoSwitch(reason: String) {
+        autoSwitched = true
+        // Posted: we're inside the listener of the player that's about to be released.
+        mainHandler.post { switchEngine(EngineKind.MPV, reason) }
+    }
+
+    private fun selectPendingSubtitle(newTracks: Tracks) {
+        val id = pendingSubtitleId ?: return
+        val group = newTracks.groups.firstOrNull { g -> g.type == C.TRACK_TYPE_TEXT && (0 until g.length).any { g.getTrackFormat(it).id?.endsWith(id) == true } }
+            ?: return
+        pendingSubtitleId = null
+        selectTrack(C.TRACK_TYPE_TEXT, TrackOption("", false, true, group.mediaTrackGroup, 0))
     }
 
     private fun canUseBaseLayer(format: Format): Boolean {
@@ -418,7 +538,7 @@ class PlayerSession(
             index = p.currentMediaItemIndex
             notice = "This device can't decode ${MediaInfo.hdrLabel(format)}. Playing the HDR10 base layer instead."
             error = null
-            buildEngine(position)
+            buildEngine(position, EngineKind.MEDIA3)
         }
     }
 
@@ -487,6 +607,15 @@ class PlayerSession(
                 .setLanguage(sidecar.language)
                 .setLabel(sidecar.label)
                 .setSelectionFlags(if (sidecar.forced) C.SELECTION_FLAG_FORCED else 0)
+                .build()
+
+        /** A subtitle served next to a media server or DLNA item. */
+        fun remoteConfig(sub: com.sine.player.source.RemoteSubtitle) =
+            MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub.url))
+                .setMimeType(subtitleMime(sub.fileName ?: Uri.parse(sub.url).lastPathSegment.orEmpty()))
+                .setLanguage(sub.language)
+                .setLabel(sub.label)
+                .setSelectionFlags(if (sub.forced) C.SELECTION_FLAG_FORCED else 0)
                 .build()
 
         val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)

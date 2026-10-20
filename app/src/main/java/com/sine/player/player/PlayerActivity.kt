@@ -18,9 +18,12 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import com.sine.player.SineApp
+import com.sine.player.mediaserver.ProgressState
+import com.sine.player.player.mpv.MpvEngine
+import com.sine.player.player.mpv.MpvPlayer
 import com.sine.player.source.Browsers
+import com.sine.player.source.MediaEntry
 import com.sine.player.source.MediaFiles
 import com.sine.player.ui.theme.SineTheme
 import kotlinx.coroutines.launch
@@ -76,33 +79,49 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
             else -> null
         }?.takeIf { it > 0 }
         val externalSubs = externalSubtitles(intent)
+        val needsLookup = Uri.parse(uri).scheme in lookupSchemes
 
-        if (folder == null) {
+        if (folder == null && !needsLookup) {
             session.start(listOf(PlayItem(uri, title, null, externalSubs)), 0, startPosition)
             return
         }
         lifecycleScope.launch {
-            val queue = runCatching { buildQueue(folder) }.getOrDefault(emptyList())
-            val start = queue.indexOfFirst { it.uri == uri }
+            val queue = folder?.let { runCatching { buildQueue(it) }.getOrDefault(emptyList()) }.orEmpty().toMutableList()
+            var start = queue.indexOfFirst { it.uri == uri }
             if (start < 0) {
-                session.start(listOf(PlayItem(uri, title, folder)), 0, startPosition)
-            } else {
-                session.start(queue, start, startPosition)
+                // Not in its folder (or no folder): server items still need their stream URL looked up.
+                val single = if (needsLookup) runCatching { Browsers.resolve(uri) }.getOrNull()?.let { toPlayItem(it, folder) } else null
+                queue.clear()
+                queue += single ?: PlayItem(uri, title, folder, externalSubs)
+                start = 0
+            } else if (Uri.parse(uri).scheme == "plex") {
+                // Plex folder listings leave out subtitle streams; fetch them for the item being opened.
+                runCatching { Browsers.resolve(uri) }.getOrNull()?.let { full -> queue[start] = toPlayItem(full, folder) }
             }
+            session.start(queue, start, startPosition)
         }
     }
 
-    /** Every video in the folder, in name order, each with its sidecar subtitles attached. */
+    /** Every video in the folder, in the folder's order, each with its subtitles attached. */
     private suspend fun buildQueue(folder: String): List<PlayItem> {
         val entries = Browsers.list(folder)
-        val names = entries.filter { !it.isDirectory }.map { it.name }
+        val names = if (Browsers.hasSidecars(folder)) entries.filter { !it.isDirectory }.map { it.name } else emptyList()
         return entries.filter { it.isVideo }.map { video ->
-            val subs = MediaFiles.findSidecars(video.name, names).map {
+            val sidecars = MediaFiles.findSidecars(video.name, names).map {
                 PlayerSession.sidecarConfig(Browsers.child(folder, it.fileName), it)
             }
-            PlayItem(video.uri, MediaFiles.baseName(video.name), folder, subs)
+            toPlayItem(video, folder, sidecars)
         }
     }
+
+    private fun toPlayItem(entry: MediaEntry, folder: String?, sidecars: List<MediaItem.SubtitleConfiguration> = emptyList()) =
+        PlayItem(
+            uri = entry.uri,
+            title = entry.title,
+            folderUri = folder,
+            subtitles = sidecars + entry.subtitles.map(PlayerSession::remoteConfig),
+            playUri = entry.playUri ?: entry.uri,
+        )
 
     private fun externalSubtitles(intent: Intent): List<MediaItem.SubtitleConfiguration> {
         @Suppress("DEPRECATION")
@@ -123,8 +142,28 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     private fun titleFor(uri: String): String = MediaFiles.baseName(Browsers.displayName(uri))
 
-    override fun createPlayer(options: EngineOptions, subtitleDelayUs: () -> Long): ExoPlayer =
-        PlayerFactory.create(this, options, subtitleDelayUs)
+    override fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long): Engine {
+        if (kind == EngineKind.MPV) {
+            runCatching { return MpvEngine(MpvPlayer(this, options, ::mpvUri), ::mpvUri) }
+                .onFailure { session.notice = "mpv couldn't start (${it.message ?: it.javaClass.simpleName}). Using Media3." }
+        }
+        return Media3Engine(PlayerFactory.create(this, options, subtitleDelayUs))
+    }
+
+    /** mpv opens http(s) and local files itself; everything else goes through the local stream proxy. */
+    private fun mpvUri(uri: String): String {
+        val parsed = Uri.parse(uri)
+        return when (parsed.scheme) {
+            "http", "https" -> uri
+            "file" -> parsed.path ?: uri
+            null -> uri
+            else -> SineApp.instance.streamProxy.urlFor(uri)
+        }
+    }
+
+    override fun onProgress(item: PlayItem, positionMs: Long, durationMs: Long, state: ProgressState) {
+        SineApp.instance.mediaServers.report(item.uri, positionMs, durationMs, state)
+    }
 
     // region Refresh-rate matching
 
@@ -211,6 +250,9 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     companion object {
         const val EXTRA_FOLDER = "com.sine.player.folder"
         const val EXTRA_TITLE = "title"
+
+        /** Schemes whose items have to be looked up to get a playable stream. */
+        private val lookupSchemes = setOf("jellyfin", "emby", "plex", "dlna")
 
         fun intent(context: Context, uri: String, title: String?, folderUri: String?): Intent =
             Intent(context, PlayerActivity::class.java)

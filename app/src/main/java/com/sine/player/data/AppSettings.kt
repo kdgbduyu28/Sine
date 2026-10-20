@@ -16,6 +16,17 @@ enum class ResumeMode(val label: String) { ASK("Ask"), ALWAYS("Always resume"), 
 
 enum class AspectMode(val label: String) { FIT("Fit"), FILL("Stretch"), ZOOM("Zoom / crop") }
 
+enum class EngineMode(val label: String, val description: String) {
+    AUTO("Auto", "Media3 first; switches to mpv when Media3 can't play a file"),
+    MPV("Always mpv", "Use mpv for everything. Media3 handles Dolby Vision and passthrough better."),
+    MEDIA3("Media3 only", "Never switch to mpv automatically"),
+}
+
+enum class MpvOutput(val label: String, val description: String) {
+    GPU("GPU", "mpv draws video and subtitles itself. Works everywhere; HDR is tone-mapped to SDR."),
+    DIRECT("Direct", "Hardware decoder renders straight to the screen, keeping HDR. mpv can't draw subtitles in this mode."),
+}
+
 /** User preferences, persisted to SharedPreferences and observable from Compose. */
 class AppSettings(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -34,6 +45,15 @@ class AppSettings(context: Context) {
     var seekStepSeconds by pref("seek_step", 10)
     var autoplayNext by pref("autoplay_next", true)
     var showHiddenFiles by pref("show_hidden", false)
+    var engineMode by enumPref("engine_mode", EngineMode.AUTO)
+    var mpvOutput by enumPref("mpv_output", MpvOutput.GPU)
+    var openSubtitlesApiKey by pref("opensubtitles_api_key", "")
+    var openSubtitlesUser by pref("opensubtitles_user", "")
+    var openSubtitlesPassword by pref("opensubtitles_password", "")
+    private var storedDeviceId by pref("device_id", "")
+
+    /** Stable id that media servers use to tell this TV apart from other clients. */
+    fun deviceId(): String = storedDeviceId.ifEmpty { java.util.UUID.randomUUID().toString().also { storedDeviceId = it } }
 
     private fun <T> pref(key: String, default: T) = PrefDelegate(key, default)
 

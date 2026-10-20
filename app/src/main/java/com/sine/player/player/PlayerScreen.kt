@@ -49,9 +49,11 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +73,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,9 +95,13 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.sine.player.data.AppSettings
 import com.sine.player.data.AspectMode
+import com.sine.player.subtitles.SubtitleQuery
+import com.sine.player.subtitles.SubtitleResult
+import com.sine.player.subtitles.SubtitleSearch
 import com.sine.player.ui.theme.SineColors
 import com.sine.player.util.Time
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -278,6 +285,11 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
         },
         update = { view ->
             if (view.player !== session.player) view.player = session.player
+            // mpv draws its own subtitles and keeps the aspect inside its frame.
+            session.engine?.let { engine ->
+                engine.setStretch(aspect == AspectMode.FILL)
+                engine.applySubtitleStyle(scale, bottom, boxed)
+            }
             view.resizeMode = when (aspect) {
                 AspectMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                 AspectMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -600,9 +612,12 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                         )
                     }
                 }
+                item { ActionRow("Search OpenSubtitles…") { onPanel(Panel.SUBTITLE_SEARCH) } }
                 item { ActionRow("Style & timing…") { onPanel(Panel.SUBTITLE_STYLE) } }
             }
         }
+
+        Panel.SUBTITLE_SEARCH -> SubtitleSearchPanel(session, onDone = { onPanel(Panel.SUBTITLES) })
 
         Panel.SUBTITLE_STYLE -> SidePanel("Subtitle style & timing", focusIndex = 0) {
             item {
@@ -649,6 +664,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                     )
                 }
             }
+            engineRows(session)
         }
 
         Panel.INFO -> SidePanel("Playback info", focusIndex = 0) {
@@ -656,6 +672,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
             val audio = session.audioFormat
             val rows = buildList {
                 add("File" to (session.current?.uri?.let { android.net.Uri.decode(it) } ?: "—"))
+                add("Engine" to (session.engineKind?.label ?: "—"))
                 video?.let { v ->
                     add("Video" to listOfNotNull(MediaInfo.videoCodec(v), "${v.width}×${v.height}", MediaInfo.frameRate(v.frameRate)).joinToString(" · "))
                     add("Dynamic range" to MediaInfo.hdrLabel(v) + if (session.baseLayerOnly && MediaInfo.isDolbyVision(v)) " (base layer)" else "")
@@ -671,6 +688,86 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 add("Buffered" to "${((session.bufferedMs - session.positionMs).coerceAtLeast(0) / 1000)} s ahead")
             }
             rows.forEachIndexed { i, (label, value) -> item { InfoRow(label, value, focusFor(i)) } }
+            engineRows(session)
+        }
+    }
+}
+
+/** Current engine and the manual "Switch engine" action, shown in the Picture and Info panels. */
+@UnstableApi
+private fun LazyListScope.engineRows(session: PlayerSession) {
+    val kind = session.engineKind ?: return
+    item { InfoRow("Engine", if (kind == EngineKind.MPV) "mpv (libmpv)" else "Media3 (ExoPlayer)") }
+    if (session.canSwitchEngine) {
+        item { ActionRow("Switch engine to ${kind.other.label}") { session.switchEngine() } }
+    }
+}
+
+private sealed interface SearchState {
+    data object NoKey : SearchState
+    data object Searching : SearchState
+    data class Failed(val message: String) : SearchState
+    data class Results(val results: List<SubtitleResult>) : SearchState
+    data class Downloading(val result: SubtitleResult) : SearchState
+}
+
+@UnstableApi
+@Composable
+private fun SubtitleSearchPanel(session: PlayerSession, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val search = remember { SubtitleSearch(context.applicationContext, session.settings) }
+    val item = session.current
+    val scope = rememberCoroutineScope()
+    var state by remember(item?.uri) { mutableStateOf<SearchState>(if (search.hasApiKey) SearchState.Searching else SearchState.NoKey) }
+    var attempt by remember { mutableIntStateOf(0) }
+    LaunchedEffect(item?.uri, attempt) {
+        if (item == null || !search.hasApiKey) return@LaunchedEffect
+        state = SearchState.Searching
+        state = runCatching { search.search(item) }.fold(
+            { if (it.isEmpty()) SearchState.Failed("Nothing found for \"${SubtitleQuery.from(item.title).text}\".") else SearchState.Results(it) },
+            { SearchState.Failed(it.message ?: it.javaClass.simpleName) },
+        )
+    }
+    SidePanel("OpenSubtitles", focusIndex = 0, focusKey = state::class) {
+        when (val current = state) {
+            SearchState.NoKey -> {
+                item { InfoRow("Add your OpenSubtitles API key in Settings → OpenSubtitles first.", null, focusFor(0)) }
+            }
+            SearchState.Searching -> item { InfoRow("Searching…", null, focusFor(0)) }
+            is SearchState.Downloading -> item { InfoRow("Downloading ${current.result.release}…", null, focusFor(0)) }
+            is SearchState.Failed -> {
+                item { InfoRow("Couldn't search", current.message) }
+                item { ActionRow("Try again") { attempt++ } }
+                item { ActionRow("Back", modifier = focusFor(0)) { onDone() } }
+            }
+            is SearchState.Results -> current.results.take(40).forEachIndexed { i, result ->
+                item {
+                    ChoiceRow(
+                        label = result.release,
+                        detail = listOfNotNull(
+                            MediaInfo.languageName(result.language) ?: result.language,
+                            if (result.hashMatch) "Matches this file" else null,
+                            if (result.hearingImpaired) "SDH" else null,
+                            "${result.downloads} downloads",
+                        ).joinToString(" · "),
+                        selected = false,
+                        onClick = {
+                            state = SearchState.Downloading(result)
+                            scope.launch {
+                                runCatching { search.download(result) }
+                                    .onSuccess { file ->
+                                        val label = "${MediaInfo.languageName(result.language) ?: result.language} · OpenSubtitles"
+                                        session.addSubtitle(android.net.Uri.fromFile(file).toString(), label, result.language)
+                                        session.notice = "Subtitle added: ${result.release}"
+                                        onDone()
+                                    }
+                                    .onFailure { state = SearchState.Failed("Download failed: ${it.message}") }
+                            }
+                        },
+                        modifier = focusFor(i),
+                    )
+                }
+            }
         }
     }
 }
@@ -687,10 +784,11 @@ private fun focusFor(index: Int): Modifier {
 }
 
 @Composable
-private fun SidePanel(title: String, focusIndex: Int, content: LazyListScope.() -> Unit) {
+private fun SidePanel(title: String, focusIndex: Int, focusKey: Any = title, content: LazyListScope.() -> Unit) {
     val requester = remember(title) { FocusRequester() }
     val listState = rememberLazyListState()
-    LaunchedEffect(title) {
+    // Re-focus when the panel's content is replaced (e.g. search results arriving).
+    LaunchedEffect(title, focusKey) {
         runCatching { listState.scrollToItem(focusIndex.coerceAtLeast(0)) }
         delay(50)
         runCatching { requester.requestFocus() }
@@ -733,8 +831,8 @@ private fun ChoiceRow(label: String, detail: String?, selected: Boolean, onClick
 }
 
 @Composable
-private fun ActionRow(label: String, onClick: () -> Unit) {
-    ListItem(selected = false, onClick = onClick, headlineContent = { Text(label) })
+private fun ActionRow(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    ListItem(selected = false, onClick = onClick, modifier = modifier, headlineContent = { Text(label) })
 }
 
 @Composable

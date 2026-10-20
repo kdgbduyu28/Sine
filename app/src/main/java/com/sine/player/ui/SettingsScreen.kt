@@ -21,11 +21,13 @@ import com.sine.player.SineApp
 import com.sine.player.data.AppSettings
 import com.sine.player.data.AspectMode
 import com.sine.player.data.DolbyVisionMode
+import com.sine.player.data.EngineMode
+import com.sine.player.data.MpvOutput
 import com.sine.player.data.ResumeMode
 import com.sine.player.source.Storage
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onOpenSubtitles: () -> Unit = {}) {
     val s = SineApp.instance.settings
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
@@ -80,6 +82,17 @@ fun SettingsScreen() {
                 })
             }
 
+            item {
+                SettingRow("Playback engine", s.engineMode.description, s.engineMode.label, {
+                    s.engineMode = next(EngineMode.entries, s.engineMode)
+                })
+            }
+            item {
+                SettingRow("mpv video output", s.mpvOutput.description, s.mpvOutput.label, {
+                    s.mpvOutput = next(MpvOutput.entries, s.mpvOutput)
+                })
+            }
+
             item { SectionTitle("Playback") }
             item {
                 SettingRow("Resume", "What to do when you reopen something you didn't finish", s.resumeMode.label, {
@@ -129,6 +142,15 @@ fun SettingsScreen() {
                 })
             }
 
+            item {
+                SettingRow(
+                    "OpenSubtitles",
+                    "Your API key for searching subtitles from the player",
+                    if (s.openSubtitlesApiKey.isBlank()) "Not set" else "Key saved",
+                    onOpenSubtitles,
+                )
+            }
+
             item { SectionTitle("Files") }
             item {
                 SettingRow(
@@ -146,7 +168,7 @@ fun SettingsScreen() {
 
             item { SectionTitle("About") }
             item {
-                SettingRow("Sine", "Media3 engine with FFmpeg audio decoding", BuildConfig.VERSION_NAME, {})
+                SettingRow("Sine", "Media3 with FFmpeg audio decoding, libmpv as the fallback engine", BuildConfig.VERSION_NAME, {})
             }
         }
     }

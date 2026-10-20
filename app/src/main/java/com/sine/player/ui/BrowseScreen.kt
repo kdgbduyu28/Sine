@@ -76,14 +76,14 @@ fun BrowseScreen(
     }
     Page(
         title = Browsers.displayName(uri),
-        subtitle = listOfNotNull(Uri.decode(uri).removePrefix("file://"), counts?.ifEmpty { null }).joinToString("   ·   "),
+        subtitle = listOfNotNull(Browsers.describe(uri).ifEmpty { null }, counts?.ifEmpty { null }).joinToString("   ·   "),
     ) {
         when {
             error != null -> Message("Couldn't open this folder", error!!) {
                 Button(onClick = { attempt++ }, modifier = Modifier.focusRequester(focus)) { Text("Try again") }
                 LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
             }
-            list == null -> Text("Loading…", color = SineColors.muted)
+            list == null -> Text(if (uri.startsWith("dlna://servers/") && Uri.parse(uri).pathSegments.isEmpty()) "Looking for DLNA servers…" else "Loading…", color = SineColors.muted)
             list.isEmpty() -> Message("Nothing to play here", "This folder has no videos or sub-folders.")
             else -> LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 itemsIndexed(list, key = { _, entry -> entry.uri }) { index, entry ->
@@ -97,7 +97,7 @@ fun BrowseScreen(
                     ListItem(
                         selected = false,
                         onClick = {
-                            if (entry.isDirectory) onOpenFolder(entry.uri) else onPlay(entry.uri, MediaFiles.baseName(entry.name), uri)
+                            if (entry.isDirectory) onOpenFolder(entry.uri) else onPlay(entry.uri, entry.title, uri)
                         },
                         modifier = Modifier
                             .onFocusChanged { if (it.isFocused) focusedIndex = index }

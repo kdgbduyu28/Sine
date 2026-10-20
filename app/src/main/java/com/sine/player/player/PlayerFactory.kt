@@ -23,7 +23,7 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import com.sine.player.data.AppSettings
 
-/** Options fixed for the lifetime of one ExoPlayer instance. */
+/** Options fixed for the lifetime of one engine instance. */
 data class EngineOptions(
     val passthrough: Boolean,
     val tunneling: Boolean,
@@ -32,6 +32,8 @@ data class EngineOptions(
     val audioLanguage: String?,
     val subtitleLanguage: String?,
     val seekStepMs: Long,
+    /** mpv only: let MediaCodec render straight to the surface (keeps HDR, no mpv-drawn subtitles). */
+    val mpvDirectOutput: Boolean = false,
 )
 
 @UnstableApi
@@ -86,6 +88,7 @@ object PlayerFactory {
         audioLanguage = settings.audioLanguage.ifEmpty { null },
         subtitleLanguage = settings.subtitleLanguage.ifEmpty { null },
         seekStepMs = settings.seekStepSeconds * 1000L,
+        mpvDirectOutput = settings.mpvOutput == com.sine.player.data.MpvOutput.DIRECT,
     )
 
     /**
