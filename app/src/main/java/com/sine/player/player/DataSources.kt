@@ -245,6 +245,7 @@ class SchemeDataSource(private val default: DataSource, private val byScheme: Ma
                     "webdav" to webDav,
                     "webdavs" to webDav,
                     com.sine.player.mediaserver.JellyfinClient.LIVE_SCHEME to com.sine.player.livetv.ServerLiveDataSource(httpFactory.createDataSource()),
+                    com.sine.player.mediaserver.PlexLive.SCHEME to com.sine.player.livetv.PlexLiveDataSource(),
                 ),
             )
         }

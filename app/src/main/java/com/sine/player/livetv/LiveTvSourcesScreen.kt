@@ -70,7 +70,7 @@ fun LiveTvSourcesScreen() {
             }
 
             val servers = com.sine.player.SineApp.instance.remoteServers.servers.filter {
-                it.kind == com.sine.player.data.ServerKind.JELLYFIN || it.kind == com.sine.player.data.ServerKind.EMBY
+                it.kind.isMediaServer
             }
             if (servers.isNotEmpty()) {
                 item { SectionTitle("From your media servers") }

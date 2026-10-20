@@ -19,9 +19,9 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.zip.GZIPInputStream
 
-enum class SourceKind(val label: String) { M3U("M3U playlist"), HDHOMERUN("HDHomeRun tuner"), MEDIA_SERVER("Jellyfin/Emby Live TV") }
+enum class SourceKind(val label: String) { M3U("M3U playlist"), HDHOMERUN("HDHomeRun tuner"), MEDIA_SERVER("Media server Live TV") }
 
-/** An IPTV playlist (URL or file) with an optional XMLTV guide, an HDHomeRun tuner, or a Jellyfin/Emby server ([LiveSource.address] = its id). */
+/** An IPTV playlist (URL or file) with an optional XMLTV guide, an HDHomeRun tuner, or a Jellyfin/Emby/Plex server ([LiveSource.address] = its id). */
 
 data class LiveSource(val id: String, val kind: SourceKind, val name: String, val address: String, val guideUrl: String?) {
     fun toJson(): JSONObject = JSONObject().put("id", id).put("kind", kind.name).put("name", name).put("address", address).put("guide", guideUrl ?: "")
@@ -122,14 +122,26 @@ class LiveTv(private val context: Context) {
                     }
                     SourceKind.MEDIA_SERVER -> {
                         val server = SineApp.instance.remoteServers.get(source.address) ?: error("server removed")
-                        val client = com.sine.player.mediaserver.JellyfinClient(server, SineApp.instance.settings.deviceId())
-                        val list = client.liveChannels(source.id)
-                        runCatching {
-                            client.livePrograms(from, to).groupBy { it.channel }.forEach { (channelId, p) ->
-                                allGuide.getOrPut("${source.id}:$channelId") { mutableListOf() } += p
-                            }
-                        }.onFailure { errors += "${source.name} guide: ${it.message}" }
-                        allChannels += list
+                        val deviceId = SineApp.instance.settings.deviceId()
+                        if (server.kind == com.sine.player.data.ServerKind.PLEX) {
+                            val plex = com.sine.player.mediaserver.PlexLive(server, deviceId)
+                            val list = plex.channels(source.id)
+                            runCatching {
+                                // Plex guide entries name the channel by identifier (or number): match on guideId.
+                                val byGuide = plex.guide(from, to).groupBy { it.channel }
+                                list.forEach { c -> byGuide[c.guideId]?.let { allGuide.getOrPut(c.id) { mutableListOf() } += it } }
+                            }.onFailure { errors += "${source.name} guide: ${it.message}" }
+                            allChannels += list
+                        } else {
+                            val client = com.sine.player.mediaserver.JellyfinClient(server, deviceId)
+                            val list = client.liveChannels(source.id)
+                            runCatching {
+                                client.livePrograms(from, to).groupBy { it.channel }.forEach { (channelId, p) ->
+                                    allGuide.getOrPut("${source.id}:$channelId") { mutableListOf() } += p
+                                }
+                            }.onFailure { errors += "${source.name} guide: ${it.message}" }
+                            allChannels += list
+                        }
                     }
                     SourceKind.HDHOMERUN -> {
                         val device = HdHomeRun.device(source.address)
