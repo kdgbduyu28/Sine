@@ -118,6 +118,7 @@ class MainActivity : ComponentActivity() {
                                 onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
                                 onShow = { nav.navigate("show/${Uri.encode(it)}") },
                                 onPlay = play,
+                                onBrowse = { nav.navigate("browse/${Uri.encode(it)}") },
                             )
                         }
                         composable("backups") { com.sine.player.backup.BackupScreen() }

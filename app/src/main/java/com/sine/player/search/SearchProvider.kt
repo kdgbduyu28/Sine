@@ -28,7 +28,9 @@ class SearchProvider : ContentProvider() {
             val data = when (r.kind) {
                 ResultKind.MOVIE -> "sine://open?type=movie&key=${Uri.encode(r.target)}"
                 ResultKind.SHOW -> "sine://open?type=show&key=${Uri.encode(r.target)}"
-                ResultKind.EPISODE, ResultKind.RECENT -> WatchNext.link(r.target, r.title, r.folder).toString()
+                ResultKind.EPISODE, ResultKind.RECENT, ResultKind.SERVER_VIDEO -> WatchNext.link(r.target, r.title, r.folder).toString()
+                // Not produced by the local search the provider runs.
+                ResultKind.SERVER_SHOW -> return@forEachIndexed
             }
             cursor.addRow(
                 arrayOf<Any?>(

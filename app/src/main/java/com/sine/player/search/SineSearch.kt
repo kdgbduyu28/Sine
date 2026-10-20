@@ -6,7 +6,7 @@ import com.sine.player.library.Library
 import java.text.Normalizer
 import java.util.Locale
 
-enum class ResultKind { MOVIE, SHOW, EPISODE, RECENT }
+enum class ResultKind { MOVIE, SHOW, EPISODE, RECENT, SERVER_VIDEO, SERVER_SHOW }
 
 data class SearchResult(
     val kind: ResultKind,

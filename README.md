@@ -65,7 +65,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 ## Phase 5: phones and the living room
 
 - **Receive from phones:** with Settings → Casting on, Sine is a DLNA "play to" screen for BubbleUPnP, Web Video Caster, NAS apps and similar. Starting playback while Sine is in the background needs "Display over other apps".
-- **Search** by typing or voice over the library and recent files; Android TV's global search and Assistant can find library titles too (Google TV no longer asks apps, so there use Sine's own search).
+- **Search** by typing or voice over the library, recent files and every Jellyfin/Emby/Plex server (server shows open as folders); Android TV's global search and Assistant can find library titles too (Google TV no longer asks apps, so there use Sine's own search).
 - **Picture-in-picture** when you press Home during a video, on TVs that support it.
 - **Phone remote:** Settings → Casting → Phone remote shows a QR code. The page on your phone types into whichever text box is selected on the TV (API keys, URLs, passwords, search), and has a D-pad, media and colour keys, a seek bar, and "play this link on the TV". Off by default; the link carries a random code, and "New link" retires old ones.
 - **Backup and restore** of settings, servers, profiles, button map, resume points and library folders, to the TV or a USB drive. The file contains server passwords and tokens.

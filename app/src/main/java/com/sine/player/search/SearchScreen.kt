@@ -50,6 +50,7 @@ fun SearchScreen(
     onMovie: (String) -> Unit,
     onShow: (String) -> Unit,
     onPlay: (uri: String, title: String?, folder: String?) -> Unit,
+    onBrowse: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     var query by remember { mutableStateOf(initialQuery) }
@@ -64,7 +65,18 @@ fun SearchScreen(
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     LaunchedEffect(query) {
         delay(250)
-        results = SineSearch.search(query)
+        val local = SineSearch.search(query)
+        results = local
+        if (query.length < 2) return@LaunchedEffect
+        // Then whatever the media servers have, after the local matches.
+        val app = com.sine.player.SineApp.instance
+        val profile = app.profiles.active
+        val fromServers = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            app.remoteServers.servers.filter { it.kind.isMediaServer }.flatMap { server ->
+                runCatching { ServerSearch.search(server, query, app.settings.deviceId()) }.getOrDefault(emptyList())
+            }
+        }.filter { profile.allows(it.target) && local.none { l -> l.target == it.target } }
+        results = local + fromServers
     }
 
     Page("Search", "Movies, shows, episodes and things you've been watching") {
@@ -91,7 +103,8 @@ fun SearchScreen(
                         when (r.kind) {
                             ResultKind.MOVIE -> onMovie(r.target)
                             ResultKind.SHOW -> onShow(r.target)
-                            ResultKind.EPISODE, ResultKind.RECENT -> onPlay(r.target, r.title, r.folder)
+                            ResultKind.EPISODE, ResultKind.RECENT, ResultKind.SERVER_VIDEO -> onPlay(r.target, r.title, r.folder)
+                            ResultKind.SERVER_SHOW -> onBrowse(r.target)
                         }
                     },
                     leadingContent = {
@@ -103,7 +116,16 @@ fun SearchScreen(
                     },
                     headlineContent = { Text(r.title) },
                     supportingContent = {
-                        Text(listOfNotNull(r.kind.name.lowercase().replaceFirstChar { it.uppercase() }.replace("Recent", "Recently watched"), r.subtitle).joinToString(" · "))
+                        Text(
+                            listOfNotNull(
+                                when (r.kind) {
+                                    ResultKind.RECENT -> "Recently watched"
+                                    ResultKind.SERVER_VIDEO, ResultKind.SERVER_SHOW -> null // the subtitle names type and server
+                                    else -> r.kind.name.lowercase().replaceFirstChar { it.uppercase() }
+                                },
+                                r.subtitle,
+                            ).joinToString(" · "),
+                        )
                     },
                 )
             }
