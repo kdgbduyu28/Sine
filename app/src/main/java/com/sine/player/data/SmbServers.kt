@@ -49,6 +49,20 @@ class SmbServers(context: Context) {
         persist()
     }
 
+    /** All servers as JSON, for copying the setup to another TV in the household. */
+    fun export(): JSONArray = JSONArray(prefs.getString("servers", "[]"))
+
+    /** Adds or replaces servers sent by another TV, keeping their ids so shared URIs still resolve. */
+    fun import(array: JSONArray): Int {
+        val incoming = parse(array)
+        incoming.forEach { server ->
+            val index = servers.indexOfFirst { it.id == server.id }
+            if (index >= 0) servers[index] = server else servers.add(server)
+        }
+        persist()
+        return incoming.size
+    }
+
     private fun persist() {
         val array = JSONArray()
         servers.forEach {
@@ -66,8 +80,9 @@ class SmbServers(context: Context) {
         prefs.edit { putString("servers", array.toString()) }
     }
 
-    private fun load(): List<SmbServer> = runCatching {
-        val array = JSONArray(prefs.getString("servers", "[]"))
+    private fun load(): List<SmbServer> = parse(JSONArray(prefs.getString("servers", "[]")))
+
+    private fun parse(array: JSONArray): List<SmbServer> = runCatching {
         (0 until array.length()).map { i ->
             val o = array.getJSONObject(i)
             SmbServer(

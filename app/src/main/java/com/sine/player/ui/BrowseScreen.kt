@@ -59,8 +59,13 @@ fun BrowseScreen(
     val resume = SineApp.instance.resume
     val resumeVersion = resume.version.intValue
 
+    val profile = SineApp.instance.profiles.active
     LaunchedEffect(uri, attempt) {
         error = null
+        if (!profile.allows(uri)) {
+            error = "This folder isn't one of ${profile.name}'s allowed folders."
+            return@LaunchedEffect
+        }
         runCatching { Browsers.visible(Browsers.list(uri)) }
             .onSuccess { entries = it }
             .onFailure { error = it.message ?: it.javaClass.simpleName }
@@ -172,13 +177,27 @@ private fun entryActions(
 ): List<MenuAction> {
     val app = SineApp.instance
     val context = androidx.compose.ui.platform.LocalContext.current
+    val kids = app.profiles.active.kids
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     fun download(block: suspend () -> String) {
         scope.launch { notify(runCatching { block() }.getOrElse { "Couldn't queue the download: ${it.message}" }) }
     }
     return buildList {
         when {
+            entry.isDirectory && kids -> {
+                add(MenuAction("Play music in this folder") { onPlayMusic(entry.uri, null) })
+                add(MenuAction("Photo slideshow") { onOpenPhotos(entry.uri, null) })
+            }
             entry.isDirectory -> {
+                app.profiles.list.filter { it.kids }.forEach { kid ->
+                    val allowed = entry.uri in kid.allowedRoots
+                    add(
+                        MenuAction(if (allowed) "Remove from ${kid.name}'s folders" else "Allow for ${kid.name}", "Kids profile: this folder and everything in it") {
+                            app.profiles.upsert(kid.copy(allowedRoots = if (allowed) kid.allowedRoots - entry.uri else kid.allowedRoots + entry.uri))
+                            notify(if (allowed) "Removed from ${kid.name}'s folders" else "${kid.name} can now watch this folder")
+                        },
+                    )
+                }
                 add(MenuAction("Download all videos", "This folder only") {
                     download { "${Downloads.enqueueFolder(context, entry.uri, includeSubfolders = false)} videos added to Downloads" }
                 })
@@ -195,7 +214,9 @@ private fun entryActions(
             entry.isVideo -> {
                 add(MenuAction("Play") { onPlay(entry.uri, entry.title, folder) })
                 val existing = app.downloads.items.firstOrNull { it.sourceUri == entry.uri }
-                if (existing == null) {
+                if (kids) {
+                    // Kids can play and mark, not download or delete.
+                } else if (existing == null) {
                     add(MenuAction("Download", "Keep a copy on this TV to watch offline") {
                         download { if (Downloads.enqueueVideo(context, entry, folder)) "Added to Downloads" else "Already in Downloads" }
                     })

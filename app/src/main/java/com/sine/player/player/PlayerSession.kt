@@ -223,6 +223,41 @@ class PlayerSession(
         if (p.playbackState == Player.STATE_ENDED) p.seekTo(0)
         wantPlay = !(p.playWhenReady && holds.isEmpty())
         applyPlayWhenReady()
+        userControl?.invoke(if (wantPlay) "play" else "pause", p.currentPosition)
+    }
+
+    /** Told about the user's play/pause/seek, so a watch-together partner can follow. */
+    var userControl: ((action: String, positionMs: Long) -> Unit)? = null
+
+    /** Play/pause/seek from another TV; doesn't echo back through [userControl]. */
+    fun applyRemote(action: String, positionMs: Long) {
+        when (action) {
+            "play" -> play()
+            "pause" -> pause()
+            "seek" -> {
+                player?.seekTo(positionMs)
+                this.positionMs = positionMs
+            }
+        }
+    }
+
+    /** Why a kids profile has to stop watching (time's up, bedtime); playback is held meanwhile. */
+    var blocked by mutableStateOf<String?>(null)
+        private set
+
+    fun block(reason: String) {
+        if (blocked == reason) return
+        blocked = reason
+        hold(HOLD_KIDS)
+    }
+
+    fun unblock() {
+        blocked = null
+        release(HOLD_KIDS)
+    }
+
+    fun fail(message: String) {
+        error = message
     }
 
     fun play() {
@@ -262,6 +297,7 @@ class PlayerSession(
         player?.seekTo(target)
         positionMs = target
         seekTargetMs = null
+        userControl?.invoke("seek", target)
     }
 
     fun seekTo(ms: Long) {
@@ -643,6 +679,7 @@ class PlayerSession(
     companion object {
         const val HOLD_RESUME = "resume"
         const val HOLD_DISPLAY = "display"
+        const val HOLD_KIDS = "kids"
 
         fun subtitleMime(fileName: String): String = when (MediaFiles.extension(fileName)) {
             "ass", "ssa" -> MimeTypes.TEXT_SSA

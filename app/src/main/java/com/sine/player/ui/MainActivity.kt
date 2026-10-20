@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -59,7 +60,24 @@ class MainActivity : ComponentActivity() {
                             nav.navigate("music") { launchSingleTop = true }
                         }
                     }
-                    NavHost(navController = nav, startDestination = "home") {
+                    val profiles = com.sine.player.SineApp.instance.profiles
+                    val start = remember { if (profiles.list.size > 1 && profiles.askOnStart && !openMusic) "profiles" else "home" }
+                    val playFrom: (String, String?, String?, Long, String?) -> Unit = { uri, title, folder, position, follow ->
+                        startActivity(PlayerActivity.intent(this@MainActivity, uri, title, folder, position, follow))
+                    }
+                    NavHost(navController = nav, startDestination = start) {
+                        composable("profiles") {
+                            com.sine.player.profiles.ProfilePickerScreen(onDone = {
+                                nav.navigate("home") { popUpTo(nav.graph.id) { inclusive = true } }
+                            })
+                        }
+                        composable("profiles/manage") {
+                            com.sine.player.profiles.ProfilesScreen(onEdit = { id -> nav.navigate("profile?id=${Uri.encode(id ?: "")}") })
+                        }
+                        composable("profile?id={id}") { entry ->
+                            com.sine.player.profiles.ProfileEditScreen(entry.arguments?.getString("id")?.ifEmpty { null }, onDone = { nav.popBackStack() })
+                        }
+                        composable("household") { com.sine.player.household.HouseholdScreen() }
                         composable("home") {
                             HomeScreen(
                                 onBrowse = { nav.navigate("browse/${Uri.encode(it)}") },
@@ -71,6 +89,10 @@ class MainActivity : ComponentActivity() {
                                 onCapabilities = { nav.navigate("capabilities") },
                                 onMusic = { nav.navigate("music") { launchSingleTop = true } },
                                 onDownloads = { nav.navigate("downloads") },
+                                onProfiles = { nav.navigate("profiles") { popUpTo(nav.graph.id) { inclusive = true } } },
+                                onManageProfiles = { nav.navigate("profiles/manage") },
+                                onOtherTvs = { nav.navigate("household") },
+                                onPlayFrom = playFrom,
                             )
                         }
                         composable("browse/{uri}") { entry ->

@@ -55,6 +55,7 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.sine.player.SineApp
 import com.sine.player.music.MusicRemote
+import kotlinx.coroutines.launch
 import com.sine.player.data.ServerKind
 import com.sine.player.source.Storage
 import com.sine.player.source.StorageVolume
@@ -72,7 +73,24 @@ fun HomeScreen(
     onCapabilities: () -> Unit,
     onMusic: () -> Unit = {},
     onDownloads: () -> Unit = {},
+    onProfiles: () -> Unit = {},
+    onManageProfiles: () -> Unit = {},
+    onOtherTvs: () -> Unit = {},
+    onPlayFrom: (uri: String, title: String?, folder: String?, positionMs: Long, followPeer: String?) -> Unit = { _, _, _, _, _ -> },
 ) {
+    val profile = SineApp.instance.profiles.active
+    val household = SineApp.instance.household
+    val peerStates = remember { androidx.compose.runtime.mutableStateMapOf<String, com.sine.player.household.NowPlayingState>() }
+    LaunchedEffect(household.peers) {
+        while (household.peers.isNotEmpty()) {
+            household.peers.forEach { peer ->
+                val state = household.nowPlaying(peer)
+                if (state == null) peerStates.remove(peer.id) else peerStates[peer.id] = state
+            }
+            kotlinx.coroutines.delay(5_000)
+        }
+        peerStates.clear()
+    }
     val context = LocalContext.current
     val app = SineApp.instance
     var volumes by remember { mutableStateOf(emptyList<StorageVolume>()) }
@@ -89,7 +107,9 @@ fun HomeScreen(
     }
 
     // Re-check when returning from Settings or after a USB drive is plugged in.
+    val syncScope = androidx.compose.runtime.rememberCoroutineScope()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        syncScope.launch { runCatching { household.syncProgress() } }
         volumes = Storage.volumes(context)
         hasAccess = Storage.hasFileAccess(context)
         if (hasAccess) pendingVolume?.let {
@@ -124,11 +144,63 @@ fun HomeScreen(
                     Text("Sine", style = MaterialTheme.typography.displaySmall, color = SineColors.accent)
                     Spacer(Modifier.width(16.dp))
                     Text(
-                        "Plays everything, the way your TV can.",
+                        if (profile.kids) "Hi ${profile.name}!" else "Plays everything, the way your TV can.",
                         style = MaterialTheme.typography.titleMedium,
                         color = SineColors.muted,
-                        modifier = Modifier.padding(bottom = 8.dp),
+                        modifier = Modifier.padding(bottom = 8.dp).weight(1f),
                     )
+                    if (SineApp.instance.profiles.list.size > 1) {
+                        androidx.tv.material3.Surface(
+                            onClick = onProfiles,
+                            shape = androidx.tv.material3.ClickableSurfaceDefaults.shape(RoundedCornerShape(24.dp)),
+                            colors = androidx.tv.material3.ClickableSurfaceDefaults.colors(containerColor = SineColors.surface, focusedContainerColor = SineColors.surfaceHigh),
+                        ) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                com.sine.player.profiles.Avatar(profile, 28)
+                                Spacer(Modifier.width(8.dp))
+                                Text(profile.name, color = SineColors.text)
+                            }
+                        }
+                    }
+                }
+            }
+
+            household.pendingHandoff?.let { handoff ->
+                item { SectionTitle("Sent from ${handoff.from}") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        item {
+                            Tile(
+                                title = handoff.title,
+                                subtitle = "Continue from ${Time.format(handoff.positionMs)} · hold OK to dismiss",
+                                icon = Icons.Filled.Movie,
+                                width = 320,
+                                onClick = {
+                                    household.pendingHandoff = null
+                                    onPlayFrom(handoff.uri, handoff.title, handoff.folder, handoff.positionMs, null)
+                                },
+                                onLongClick = { household.pendingHandoff = null },
+                            )
+                        }
+                    }
+                }
+            }
+
+            val watching = household.peers.mapNotNull { peer -> peerStates[peer.id]?.let { peer to it } }
+            if (watching.isNotEmpty()) {
+                item { SectionTitle("Watch together") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(watching, key = { it.first.id }) { (peer, state) ->
+                            Tile(
+                                title = state.title,
+                                subtitle = "${peer.name} · ${if (state.playing) "playing" else "paused"} at ${Time.format(state.positionMs)}",
+                                icon = Icons.Filled.Movie,
+                                width = 320,
+                                onClick = { onPlayFrom(state.uri, state.title, state.folder, state.positionMs, peer.id) },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -161,7 +233,7 @@ fun HomeScreen(
                         items(continueWatching, key = { it.uri }) { record ->
                             Tile(
                                 title = record.title,
-                                subtitle = Time.remaining(record.durationMs - record.positionMs),
+                                subtitle = listOfNotNull(record.fromDevice?.let { "from $it" }, Time.remaining(record.durationMs - record.positionMs)).joinToString(" · "),
                                 icon = Icons.Filled.Movie,
                                 progress = record.progress,
                                 width = 300,
@@ -174,6 +246,19 @@ fun HomeScreen(
                 }
             }
 
+            if (profile.kids) {
+                item { SectionTitle("Your shows") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(profile.allowedRoots, key = { it }) { root ->
+                            Tile(com.sine.player.source.Browsers.displayName(root), null, Icons.Filled.VideoLibrary, onClick = { onBrowse(root) })
+                        }
+                        item { Tile("Switch profile", null, Icons.Filled.Settings, onClick = onProfiles) }
+                    }
+                }
+            }
+
+            if (!profile.kids) {
             item { SectionTitle("This device") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -262,8 +347,11 @@ fun HomeScreen(
                     item {
                         Tile("What this TV can play", "Dolby Vision, HDR, passthrough", Icons.Filled.Memory, onClick = onCapabilities, width = 280)
                     }
+                    item { Tile("Profiles", "${SineApp.instance.profiles.list.size} · kids mode, PINs", Icons.Filled.Settings, onClick = onManageProfiles) }
+                    item { Tile("Other TVs", if (household.peers.isEmpty()) "Multi-room" else "${household.peers.size} found", Icons.Filled.Router, onClick = onOtherTvs) }
                     item { Tile("Settings", "Audio, subtitles, playback", Icons.Filled.Settings, onClick = onSettings) }
                 }
+            }
             }
         }
 

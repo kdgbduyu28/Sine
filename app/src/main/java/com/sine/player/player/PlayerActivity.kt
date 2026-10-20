@@ -53,6 +53,9 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         val app = SineApp.instance
         session = PlayerSession(this, app.settings, app.resume)
         updateDisplayModeLabel()
+        session.userControl = { action, position -> sendToPartner(action, position) }
+        handler.post(householdTick)
+        handler.post(kidsTick)
         setContent {
             SineTheme {
                 PlayerScreen(session = session, onExit = { finishWithResult() })
@@ -71,6 +74,12 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     private fun openFromIntent(intent: Intent) {
         val uri = intent.data?.toString() ?: run {
             finish()
+            return
+        }
+        following = intent.getStringExtra(EXTRA_FOLLOW)
+        val profile = SineApp.instance.profiles.active
+        if (!profile.allows(uri)) {
+            session.fail("This video isn't in the folders allowed for ${profile.name}.")
             return
         }
         val folder = intent.getStringExtra(EXTRA_FOLDER)
@@ -213,13 +222,15 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         displayListener = listener
         manager.registerDisplayListener(listener, handler)
         window.attributes = window.attributes.also { it.preferredDisplayModeId = target.id }
-        handler.postDelayed(::displayModeSettled, 6_000)
+        handler.postDelayed(settleTimeout, 6_000)
     }
+
+    private val settleTimeout = Runnable { displayModeSettled() }
 
     private fun displayModeSettled() {
         if (pendingModeId == 0) return
         pendingModeId = 0
-        handler.removeCallbacksAndMessages(null)
+        handler.removeCallbacks(settleTimeout)
         displayListener?.let { (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).unregisterDisplayListener(it) }
         displayListener = null
         updateDisplayModeLabel()
@@ -235,6 +246,76 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     @Suppress("DEPRECATION")
     private fun currentDisplay(): Display? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else windowManager.defaultDisplay
+
+    // endregion
+
+    // region Household: watch together and kids time
+
+    /** Id of the TV this one follows in "Watch together", if any. */
+    private var following: String? = null
+    private var lastSyncedUri: String? = null
+    private var followBusy = false
+
+    private val householdTick = object : Runnable {
+        override fun run() {
+            val household = SineApp.instance.household
+            val item = session.current
+            household.nowPlaying = item?.let {
+                com.sine.player.household.NowPlayingState(it.uri, it.title, it.folderUri, session.positionMs, session.isPlaying, SineApp.instance.profiles.active.name)
+            }
+            household.control = { action, position -> session.applyRemote(action, position) }
+            following?.takeIf { !followBusy }?.let { peerId ->
+                followBusy = true
+                lifecycleScope.launch {
+                    runCatching { followStep(peerId) }
+                    followBusy = false
+                }
+            }
+            handler.postDelayed(this, 1_000)
+        }
+    }
+
+    /** One sync step while following another TV: same file, same play state, within ~0.7 s. */
+    private suspend fun followStep(peerId: String) {
+        val household = SineApp.instance.household
+        val peer = household.peers.firstOrNull { it.id == peerId } ?: return
+        val sent = android.os.SystemClock.elapsedRealtime()
+        val state = household.nowPlaying(peer) ?: return
+        val rtt = android.os.SystemClock.elapsedRealtime() - sent
+        if (state.uri != session.current?.uri) {
+            if (lastSyncedUri == state.uri) return
+            lastSyncedUri = state.uri
+            session.releasePlayer()
+            session.start(listOf(SubtitleCache.attach(Downloads.localize(PlayItem(state.uri, state.title, state.folder)))), 0, state.positionMs)
+            return
+        }
+        if (state.playing != session.isPlaying) session.applyRemote(if (state.playing) "play" else "pause", 0)
+        val target = state.positionMs + if (state.playing) rtt / 2 else 0
+        if (kotlin.math.abs(target - session.positionMs) > 700) session.applyRemote("seek", target)
+    }
+
+    private fun sendToPartner(action: String, position: Long) {
+        val peerId = following ?: return
+        val household = SineApp.instance.household
+        val peer = household.peers.firstOrNull { it.id == peerId } ?: return
+        lifecycleScope.launch { household.sendControl(peer, action, position) }
+    }
+
+    private val kidsTick = object : Runnable {
+        override fun run() {
+            val profiles = SineApp.instance.profiles
+            val profile = profiles.active
+            if (profile.kids) {
+                if (session.isPlaying) profiles.addWatched(profile.id, KIDS_TICK_SECONDS)
+                when (val block = profiles.block(profile)) {
+                    null -> if (session.blocked != null) session.unblock()
+                    com.sine.player.profiles.KidsBlock.Bedtime -> session.block("It's bedtime, ${profile.name}. Time to sleep!")
+                    is com.sine.player.profiles.KidsBlock.TimeUp -> session.block("That's ${block.minutes} minutes of watching today, ${profile.name}. Time for a break!")
+                }
+            }
+            handler.postDelayed(this, KIDS_TICK_SECONDS * 1000L)
+        }
+    }
 
     // endregion
 
@@ -266,6 +347,9 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     override fun onDestroy() {
         Downloads.cleanup()
+        SineApp.instance.household.nowPlaying = null
+        SineApp.instance.household.control = null
+        SineApp.instance.scope.launch { runCatching { SineApp.instance.household.syncProgress() } }
         handler.removeCallbacksAndMessages(null)
         displayListener?.let { (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).unregisterDisplayListener(it) }
         session.releasePlayer()
@@ -275,14 +359,20 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     companion object {
         const val EXTRA_FOLDER = "com.sine.player.folder"
         const val EXTRA_TITLE = "title"
+        const val EXTRA_FOLLOW = "com.sine.player.follow"
+        private const val KIDS_TICK_SECONDS = 10
 
         /** Schemes whose items have to be looked up to get a playable stream. */
         private val lookupSchemes = setOf("jellyfin", "emby", "plex", "dlna")
 
-        fun intent(context: Context, uri: String, title: String?, folderUri: String?): Intent =
+        fun intent(context: Context, uri: String, title: String?, folderUri: String?, positionMs: Long? = null, followPeer: String? = null): Intent =
             Intent(context, PlayerActivity::class.java)
                 .setData(Uri.parse(uri))
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_FOLDER, folderUri)
+                .apply {
+                    positionMs?.let { putExtra("extra_position", it) }
+                    followPeer?.let { putExtra(EXTRA_FOLLOW, it) }
+                }
     }
 }

@@ -8,6 +8,8 @@ import com.sine.player.data.ResumeStore
 import com.sine.player.data.SmbServers
 import com.sine.player.downloads.DownloadStore
 import com.sine.player.downloads.Downloads
+import com.sine.player.household.Household
+import com.sine.player.profiles.Profiles
 import com.sine.player.mediaserver.MediaServers
 import com.sine.player.net.Dlna
 import com.sine.player.net.NfsConnections
@@ -39,6 +41,13 @@ class SineApp : Application() {
         private set
     lateinit var downloads: DownloadStore
         private set
+    lateinit var profiles: Profiles
+        private set
+    lateinit var household: Household
+        private set
+
+    /** For work that should outlive a screen (syncing progress after playback ends). */
+    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
 
     /** Lets mpv read every source Sine can; started on first use. */
     val streamProxy: StreamProxy by lazy { StreamProxy(SchemeDataSource.Factory(this)) }
@@ -47,7 +56,8 @@ class SineApp : Application() {
         super.onCreate()
         instance = this
         settings = AppSettings(this)
-        resume = ResumeStore(this)
+        profiles = Profiles(this)
+        resume = ResumeStore(this) { profiles.activeId }
         smbServers = SmbServers(this)
         smb = SmbConnections(smbServers)
         remoteServers = RemoteServers(this)
@@ -58,6 +68,8 @@ class SineApp : Application() {
         downloads = DownloadStore(File(filesDir, "downloads.json"))
         Downloads.cleanup()
         if (downloads.nextQueued() != null) Downloads.schedule(this)
+        household = Household(this)
+        runCatching { household.start() }
     }
 
     companion object {

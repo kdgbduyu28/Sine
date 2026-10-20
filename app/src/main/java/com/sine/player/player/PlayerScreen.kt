@@ -236,7 +236,7 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
         }
 
         panel?.let { current ->
-            SidePanelHost(session, current, onPanel = { panel = it })
+            SidePanelHost(session, current, onPanel = { panel = it }, onExit = onExit)
         }
 
         session.resumePrompt?.let { prompt ->
@@ -245,6 +245,10 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
 
         session.error?.let { message ->
             ErrorDialog(message, onClose = onExit)
+        }
+
+        session.blocked?.let { reason ->
+            KidsBlockDialog(session, reason, onExit)
         }
 
         session.notice?.let { message ->
@@ -553,6 +557,36 @@ private fun ErrorDialog(message: String, onClose: () -> Unit) {
     }
 }
 
+@UnstableApi
+@Composable
+private fun KidsBlockDialog(session: PlayerSession, reason: String, onExit: () -> Unit) {
+    val profiles = com.sine.player.SineApp.instance.profiles
+    val focus = remember { FocusRequester() }
+    var askPin by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    DialogBox {
+        Text("Time to stop", style = MaterialTheme.typography.headlineSmall, color = SineColors.text)
+        Spacer(Modifier.height(8.dp))
+        Text(reason, style = MaterialTheme.typography.bodyLarge, color = SineColors.muted)
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Button(onClick = onExit, modifier = Modifier.focusRequester(focus)) { Text("OK") }
+            if (profiles.hasParentPin) OutlinedButton(onClick = { askPin = true }) { Text("Parent: 30 more minutes") }
+        }
+    }
+    if (askPin) {
+        com.sine.player.profiles.PinDialog("Parent PIN", "Adds 30 minutes for today", onSubmit = { pin ->
+            val ok = profiles.checkParentPin(pin)
+            if (ok) {
+                askPin = false
+                profiles.grantExtra(profiles.activeId, 30)
+                session.unblock()
+            }
+            ok
+        }, onDismiss = { askPin = false })
+    }
+}
+
 @Composable
 private fun DialogBox(content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
@@ -570,7 +604,7 @@ private fun DialogBox(content: @Composable () -> Unit) {
 
 @UnstableApi
 @Composable
-private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?) -> Unit) {
+private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?) -> Unit, onExit: () -> Unit) {
     val settings = session.settings
     when (panel) {
         Panel.AUDIO -> {
@@ -693,6 +727,30 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
             }
             rows.forEachIndexed { i, (label, value) -> item { InfoRow(label, value, focusFor(i)) } }
             engineRows(session)
+            handoffRows(session, onExit)
+        }
+    }
+}
+
+/** "Continue on <other TV>": sends the current file and position, then closes the player here. */
+@UnstableApi
+private fun LazyListScope.handoffRows(session: PlayerSession, onExit: () -> Unit) {
+    val household = com.sine.player.SineApp.instance.household
+    val item = session.current ?: return
+    household.peers.forEach { peer ->
+        item {
+            val scope = rememberCoroutineScope()
+            ActionRow("Continue on ${peer.name}") {
+                val state = com.sine.player.household.NowPlayingState(item.uri, item.title, item.folderUri, session.positionMs, true, com.sine.player.SineApp.instance.profiles.active.name)
+                scope.launch {
+                    household.handoff(peer, state)
+                        .onSuccess {
+                            session.pause()
+                            onExit()
+                        }
+                        .onFailure { session.notice = "Couldn't reach ${peer.name}: ${it.message}" }
+                }
+            }
         }
     }
 }

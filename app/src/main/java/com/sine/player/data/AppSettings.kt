@@ -78,10 +78,32 @@ class AppSettings(context: Context) {
     var avoidHearingImpaired by pref("avoid_sdh", true)
     var podnapisiEnabled by pref("podnapisi", true)
     var subdlApiKey by pref("subdl_api_key", "")
+    var householdEnabled by pref("household_enabled", false)
+    private var storedHouseholdCode by pref("household_code", "")
+    private var storedDeviceName by pref("device_name", "")
+    var rememberPerFile by pref("remember_per_file", true)
     private var storedDeviceId by pref("device_id", "")
 
     /** Stable id that media servers use to tell this TV apart from other clients. */
     fun deviceId(): String = storedDeviceId.ifEmpty { java.util.UUID.randomUUID().toString().also { storedDeviceId = it } }
+
+    /** Shared by every TV in the household; set by whichever TV joins another. */
+    fun householdCode(): String = storedHouseholdCode.ifEmpty {
+        com.sine.player.household.Household.newCode().also { storedHouseholdCode = it }
+    }
+
+    fun setHouseholdCode(code: String) {
+        storedHouseholdCode = code.trim().uppercase(java.util.Locale.US)
+    }
+
+    /** What other TVs call this one, e.g. "Living room". */
+    fun deviceName(): String = storedDeviceName.ifEmpty {
+        "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim().replaceFirstChar { it.uppercase() }
+    }
+
+    fun setDeviceName(name: String) {
+        storedDeviceName = name.trim()
+    }
 
     private fun <T> pref(key: String, default: T) = PrefDelegate(key, default)
 
