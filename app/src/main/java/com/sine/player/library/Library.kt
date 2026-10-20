@@ -119,6 +119,20 @@ object Library {
         )
     }
 
+    /** Collections with at least two of the profile's movies, by name; movies in release order. */
+    fun collections(): List<Pair<MovieCollection, List<Movie>>> {
+        val profile = SineApp.instance.profiles.active
+        val movies = store.movies.filter { profile.allows(it.file.uri) }.distinctBy { it.key }
+        return groupCollections(movies.mapNotNull { m -> store.meta[m.key]?.collection?.let { c -> Triple(m, c, store.meta[m.key]?.year ?: m.year) } })
+    }
+
+    /** Pure grouping for [collections]. */
+    fun <M> groupCollections(items: List<Triple<M, MovieCollection, Int?>>): List<Pair<MovieCollection, List<M>>> =
+        items.groupBy { it.second.id }.values
+            .filter { it.size >= 2 }
+            .map { group -> group.first().second to group.sortedWith(compareBy({ it.third == null }, { it.third ?: 0 })).map { it.first } }
+            .sortedBy { LibraryFilter.sortTitle(it.first.name) }
+
     /** Movies (or shows) in the library most like [key], for "More like this". */
     fun similar(kind: LibraryKind, key: String, limit: Int = 12): List<GridEntry<Any>> {
         val profile = SineApp.instance.profiles.active
@@ -144,7 +158,7 @@ object Library {
         val month = 30L * 24 * 3_600_000
         store.movies.distinctBy { it.key }.forEach { movie ->
             val existing = store.meta[movie.key]
-            if (!force && existing != null && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            if (!force && existing != null && existing.collectionKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${movie.title}"
             runCatching { tmdb.movie(movie.title, movie.year) }.getOrNull()
                 ?.let { store.putMeta(movie.key, it) }

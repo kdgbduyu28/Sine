@@ -82,6 +82,7 @@ fun HomeScreen(
     onLibrary: (com.sine.player.library.LibraryKind) -> Unit = {},
     onSearch: () -> Unit = {},
     onLiveTv: () -> Unit = {},
+    onCollection: (Int) -> Unit = {},
     onMovie: (String) -> Unit = {},
     onShow: (String) -> Unit = {},
 ) {
@@ -345,6 +346,22 @@ fun HomeScreen(
                             )
                         }
                         item { Tile("All movies", "${movies.size}", Icons.Filled.VideoLibrary, onClick = { onLibrary(com.sine.player.library.LibraryKind.MOVIES) }, width = 150) }
+                    }
+                }
+            }
+            val collections = com.sine.player.library.Library.collections()
+            if (collections.isNotEmpty()) {
+                item { SectionTitle("Collections") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(collections, key = { it.first.id }) { (collection, movies) ->
+                            com.sine.player.library.PosterCard(
+                                collection.name.removeSuffix(" Collection"),
+                                "${movies.size} films",
+                                collection.poster ?: com.sine.player.library.Library.posterFor(movies.first().key, movies.first().localPoster),
+                                onClick = { onCollection(collection.id) },
+                            )
+                        }
                     }
                 }
             }

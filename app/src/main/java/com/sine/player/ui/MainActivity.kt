@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                                 onShow = { nav.navigate("show/${Uri.encode(it)}") },
                                 onSearch = { nav.navigate("search?q=") },
                                 onLiveTv = { nav.navigate("livetv") },
+                                onCollection = { nav.navigate("collection/$it") },
                             )
                         }
                         composable("search?q={q}") { entry ->
@@ -202,6 +203,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable("capabilities") { CapabilitiesScreen() }
+                        composable("collection/{id}") { entry ->
+                            com.sine.player.library.CollectionScreen(
+                                entry.arguments?.getString("id")?.toIntOrNull() ?: 0,
+                                onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
+                            )
+                        }
                     }
                 }
             }

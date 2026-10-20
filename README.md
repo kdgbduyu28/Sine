@@ -35,6 +35,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - **Library folders** from any source (hold OK on a folder → Add to library as Movies or TV shows). Titles, years, seasons and episodes come from file and folder names; samples and extras are skipped. Rescans every 12 hours or on demand.
 - **Posters and details** from TMDB with your own API key (v3 key or v4 token); a local `poster.jpg`/`folder.jpg` works without one.
 - **From your servers:** a home row with Jellyfin/Emby Continue watching and Next up, and Plex On Deck, including things started in other apps; episodes play with their season as the playlist.
+- **Collections:** films from the same TMDB collection grouped on the home screen and on their own page, in release order (needs two or more in your library).
 - **Recently added** from your servers: the newest movies and episodes on each Jellyfin/Emby/Plex server, newest first.
 - **Home rows:** Next up, Movies, TV shows; poster grids you can sort (recently added, A–Z ignoring "The", newest, top rated) and filter (unwatched, genre), remembered per grid; movie and show pages with resume, start over, watched, seasons, a **Trailer** button (TMDB trailer in the YouTube app) and **More like this** from your own library.
 - **TV launcher:** Continue watching / Play next entries that reopen Sine where you left off.

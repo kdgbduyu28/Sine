@@ -87,11 +87,18 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
             rating = o.optDouble("vote_average", 0.0).takeIf { it > 0 },
             genres = (0 until genres.length()).mapNotNull { genres.optJSONObject(it)?.optString("name") },
             year = o.optString(dateField).take(4).toIntOrNull(),
+            collection = collection(o),
         )
     }
 
     companion object {
         private const val API = "https://api.themoviedb.org/3"
+
+        /** `belongs_to_collection` from movie details. */
+        fun collection(o: JSONObject): MovieCollection? = o.optJSONObject("belongs_to_collection")?.let { c ->
+            val id = c.optInt("id").takeIf { it > 0 } ?: return null
+            MovieCollection(id, c.optString("name"), image(c.optString("poster_path"), "w342"), image(c.optString("backdrop_path"), "w1280"))
+        }
 
         fun image(path: String?, size: String): String? =
             path?.takeIf { it.isNotBlank() && it != "null" }?.let { "https://image.tmdb.org/t/p/$size$it" }

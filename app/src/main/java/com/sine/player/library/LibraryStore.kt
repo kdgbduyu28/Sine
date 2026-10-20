@@ -38,6 +38,9 @@ data class Show(
 
 data class EpisodeMeta(val name: String?, val overview: String?, val still: String?)
 
+/** A TMDB movie collection ("The Lord of the Rings Collection"). */
+data class MovieCollection(val id: Int, val name: String, val poster: String?, val backdrop: String?)
+
 /** Details from TMDB (or nothing, when there's no key or no match). */
 data class Meta(
     val tmdbId: Int?,
@@ -50,6 +53,9 @@ data class Meta(
     val year: Int?,
     val episodes: Map<String, EpisodeMeta> = emptyMap(),
     val fetchedAt: Long = System.currentTimeMillis(),
+    val collection: MovieCollection? = null,
+    /** False for details saved before collections existed; those movies get looked up again. */
+    val collectionKnown: Boolean = true,
 )
 
 /** The library index: roots, what the last scan found, and cached metadata. Saved as JSON. */
@@ -172,6 +178,7 @@ class LibraryStore(private val file: File) {
         fun encodeMeta(m: Meta): JSONObject = JSONObject().put("tmdb", m.tmdbId ?: 0).put("title", m.title ?: "").put("overview", m.overview ?: "")
             .put("poster", m.poster ?: "").put("backdrop", m.backdrop ?: "").put("rating", m.rating ?: 0.0)
             .put("genres", JSONArray(m.genres)).put("year", m.year ?: 0).put("at", m.fetchedAt)
+            .put("collection", m.collection?.let { JSONObject().put("id", it.id).put("name", it.name).put("poster", it.poster ?: "").put("backdrop", it.backdrop ?: "") } ?: JSONObject())
             .put("episodes", JSONObject().apply { m.episodes.forEach { (k, e) -> put(k, JSONObject().put("name", e.name ?: "").put("overview", e.overview ?: "").put("still", e.still ?: "")) } })
 
         fun decodeMeta(o: JSONObject): Meta {
@@ -191,6 +198,10 @@ class LibraryStore(private val file: File) {
                     EpisodeMeta(e.optString("name").ifEmpty { null }, e.optString("overview").ifEmpty { null }, e.optString("still").ifEmpty { null })
                 },
                 fetchedAt = o.optLong("at"),
+                collection = o.optJSONObject("collection")?.takeIf { it.optInt("id") > 0 }?.let {
+                    MovieCollection(it.getInt("id"), it.optString("name"), it.optString("poster").ifEmpty { null }, it.optString("backdrop").ifEmpty { null })
+                },
+                collectionKnown = o.has("collection"),
             )
         }
     }

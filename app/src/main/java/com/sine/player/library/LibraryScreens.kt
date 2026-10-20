@@ -196,6 +196,47 @@ fun LibraryGridScreen(kind: LibraryKind, onMovie: (String) -> Unit, onShow: (Str
     }
 }
 
+/** The library's films from one TMDB collection, in release order, over the collection's backdrop. */
+@UnstableApi
+@Composable
+fun CollectionScreen(id: Int, onMovie: (String) -> Unit) {
+    val entry = Library.collections().firstOrNull { it.first.id == id } ?: run {
+        Message("Collection not found", "It needs at least two of its films in your library.")
+        return
+    }
+    val (collection, movies) = entry
+    val resume = SineApp.instance.resume
+    resume.version.intValue
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Box(Modifier.fillMaxSize().background(SineColors.background)) {
+        Backdrop(collection.backdrop)
+        Column(Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 48.dp)) {
+            Text(collection.name, style = MaterialTheme.typography.displaySmall, color = SineColors.text, maxLines = 2)
+            Spacer(Modifier.height(8.dp))
+            val watched = movies.count { resume.get(it.file.uri)?.watched == true }
+            Text("${movies.size} films · $watched watched", style = MaterialTheme.typography.titleMedium, color = SineColors.muted)
+            Spacer(Modifier.height(24.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                items(movies, key = { it.key }) { movie ->
+                    val meta = Library.store.meta[movie.key]
+                    val record = resume.get(movie.file.uri)
+                    PosterCard(
+                        meta?.title ?: movie.title,
+                        (meta?.year ?: movie.year)?.toString(),
+                        Library.posterFor(movie.key, movie.localPoster),
+                        onClick = { onMovie(movie.key) },
+                        modifier = if (movie == movies.first()) Modifier.focusRequester(focus) else Modifier,
+                        progress = record?.takeIf { it.resumable }?.progress,
+                        watched = record?.watched == true,
+                        width = 170,
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** Opens the TMDB trailer in YouTube; hidden without a TMDB match or key. */
 @Composable
 private fun TrailerButton(tmdbId: Int?, tv: Boolean) {
