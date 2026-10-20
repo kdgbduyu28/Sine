@@ -98,6 +98,10 @@ class AppSettings(context: Context) {
     var rememberPerFile by pref("remember_per_file", true)
     /** Audio/subtitle picked on one episode applies to the rest of its folder. */
     var rememberPerFolder by pref("remember_per_folder", true)
+    /** Media server bitrate cap in Mbps (server transcodes to HLS); 0 = original file. */
+    var serverQualityMbps by pref("server_quality_mbps", 0)
+    /** Apply the cap only when the server isn't on the home network. */
+    var transcodeAwayOnly by pref("transcode_away_only", true)
     var skipSegments by enumPref("skip_segments", SkipMode.BUTTON)
     var nightMode by pref("night_mode", false)
     var dialogueBoost by pref("dialogue_boost", false)

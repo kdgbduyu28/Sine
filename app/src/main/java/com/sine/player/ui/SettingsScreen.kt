@@ -112,6 +112,24 @@ fun SettingsScreen(
 
             item { SectionTitle("Playback") }
             item {
+                SettingRow(
+                    "Server streaming quality",
+                    "Jellyfin, Emby and Plex convert to this bitrate for slow connections. Original plays the file as is.",
+                    com.sine.player.mediaserver.Transcode.label(s.serverQualityMbps),
+                    { s.serverQualityMbps = next(com.sine.player.mediaserver.Transcode.choices, s.serverQualityMbps) },
+                )
+            }
+            if (s.serverQualityMbps > 0) {
+                item {
+                    SettingRow(
+                        "Only away from home",
+                        "Servers on this network (private addresses, .local names) still play the original",
+                        onOff(s.transcodeAwayOnly),
+                        { s.transcodeAwayOnly = !s.transcodeAwayOnly },
+                    )
+                }
+            }
+            item {
                 SettingRow("Skip intros and credits", s.skipSegments.description + " (uses chapter names or Jellyfin's markers)", s.skipSegments.label, {
                     s.skipSegments = next(com.sine.player.data.SkipMode.entries, s.skipSegments)
                 })

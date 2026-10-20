@@ -174,8 +174,19 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
             title = entry.title,
             folderUri = folder,
             subtitles = sidecars + entry.subtitles.map(PlayerSession::remoteConfig),
-            playUri = entry.playUri ?: entry.uri,
+            playUri = transcoded(entry) ?: entry.playUri ?: entry.uri,
         )
+
+    /** A capped-bitrate HLS stream from the server when Settings → Server streaming quality asks for one. */
+    private fun transcoded(entry: MediaEntry): String? {
+        val settings = SineApp.instance.settings
+        if (settings.serverQualityMbps <= 0) return null
+        val (serverId, kind, id) = com.sine.player.mediaserver.MediaServerUris.parse(entry.uri) ?: return null
+        if (kind != "i" || id == null) return null
+        val server = SineApp.instance.remoteServers.get(serverId) ?: return null
+        if (!com.sine.player.mediaserver.Transcode.applies(server, settings.serverQualityMbps, settings.transcodeAwayOnly)) return null
+        return com.sine.player.mediaserver.Transcode.url(server, id, settings.serverQualityMbps, settings.deviceId())
+    }
 
     private fun externalSubtitles(intent: Intent): List<MediaItem.SubtitleConfiguration> {
         @Suppress("DEPRECATION")
@@ -225,6 +236,9 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     }
 
     override fun onItemReady(item: PlayItem) {
+        if (item.playUri.contains("/master.m3u8") || item.playUri.contains("/transcode/universal/")) {
+            session.notice = "Server is converting this to ${SineApp.instance.settings.serverQualityMbps} Mbps (Settings → Server streaming quality)"
+        }
         SineApp.instance.liveTv.channelFor(item.uri)?.let { channel ->
             // Live channel: say what's on instead of looking for chapters.
             SineApp.instance.liveTv.lastChannel = channel.id

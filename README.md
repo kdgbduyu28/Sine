@@ -24,6 +24,8 @@ A video player for Android TV / Google TV / Fire TV that aims to replace switchi
 
 All of these sit in Home → Network, next to SMB shares. "Add server" picks the kind.
 
+**Away from home:** Settings → Playback → Server streaming quality asks Jellyfin, Emby or Plex to convert to 2–40 Mbps HLS. By default only servers that aren't on the home network (private IPs, `.local` names) are converted; embedded text subtitles may not come through a conversion, external ones do.
+
 ### Server notes
 
 - **NFS:** Android apps can't use ports below 1024, so the export must allow non-privileged ports (`insecure` in `/etc/exports`; Synology: "Allow connections from non-privileged ports").
