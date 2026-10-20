@@ -80,6 +80,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - One APK per CPU type (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) plus a universal one.
 - Pushing a `v*` tag builds signed APKs on GitHub Actions and attaches them to a GitHub release.
 - Settings → About → **Check for updates** downloads the APK for the TV's CPU from the latest release and opens the installer.
+- **Clear caches** in Settings → About shows how much space thumbnails, posters and update downloads take and frees it.
 - **Diagnostics:** the last crash is kept; Save a log writes the app log to `Sine/logs` for bug reports.
 
 ## Phase 7: Live TV

@@ -77,6 +77,22 @@ fun AboutScreen() {
 
             item { SectionTitle("Diagnostics") }
             item {
+                var cacheBytes by remember { mutableStateOf<Long?>(null) }
+                androidx.compose.runtime.LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { Caches.size(context) } }
+                SettingRow(
+                    "Clear caches",
+                    "Thumbnails, posters, update downloads and other scratch files; they come back as needed",
+                    cacheBytes?.let { com.sine.player.source.MediaFiles.formatSize(it).ifEmpty { "Empty" } } ?: "…",
+                    {
+                        scope.launch {
+                            withContext(Dispatchers.IO) { Caches.clear(context) }
+                            cacheBytes = withContext(Dispatchers.IO) { Caches.size(context) }
+                            status = "Caches cleared"
+                        }
+                    },
+                )
+            }
+            item {
                 SettingRow("Save a log", "Writes the app log (and last crash) to Sine/logs, to attach to a bug report", "", {
                     scope.launch {
                         status = withContext(Dispatchers.IO) { runCatching { "Saved ${Diagnostics.saveReport(context).path}" }.getOrElse { "Couldn't save: ${it.message}" } }
