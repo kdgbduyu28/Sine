@@ -294,6 +294,7 @@ class MpvPlayer(
         lib.setPropertyBoolean("pause", !playWhenReady)
         lib.setPropertyString("start", if (startMs > 0) String.format(Locale.US, "%.3f", startMs / 1000.0) else "none")
         val target = resolve(uri)
+        applyHeaders(lib, target)
         lib.command(arrayOf("loadfile", discTarget(lib, target) ?: target, "replace"))
     }
 
@@ -301,6 +302,15 @@ class MpvPlayer(
      * Disc images play through libbluray/libdvdnav, which need a local file: point mpv's disc
      * device at the ISO and open bd:// or dvd:// (a Blu-ray image is bigger than a dual-layer DVD).
      */
+    /** Per-host headers some IPTV providers require; reset for everything else. */
+    private fun applyHeaders(lib: MPVLib, target: String) {
+        val headers = com.sine.player.net.HostHeaders.forUrl(target)
+        runCatching {
+            lib.setPropertyString("user-agent", com.sine.player.net.HostHeaders.userAgent(headers) ?: "Sine/1.0 (Android TV)")
+            lib.setPropertyString("http-header-fields", com.sine.player.net.HostHeaders.mpvFields(headers))
+        }
+    }
+
     private fun discTarget(lib: MPVLib, target: String): String? {
         if (!target.endsWith(".iso", ignoreCase = true) || target.contains("://")) return null
         val size = java.io.File(target).length()

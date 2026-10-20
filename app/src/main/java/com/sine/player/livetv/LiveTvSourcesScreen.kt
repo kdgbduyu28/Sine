@@ -69,6 +69,19 @@ fun LiveTvSourcesScreen() {
                 )
             }
 
+            val servers = com.sine.player.SineApp.instance.remoteServers.servers.filter {
+                it.kind == com.sine.player.data.ServerKind.JELLYFIN || it.kind == com.sine.player.data.ServerKind.EMBY
+            }
+            if (servers.isNotEmpty()) {
+                item { SectionTitle("From your media servers") }
+                items(servers, key = { "server:" + it.id }) { server ->
+                    val isAdded = live.sources.any { it.kind == SourceKind.MEDIA_SERVER && it.address == server.id }
+                    SettingRow(server.displayName, "${server.kind.label} Live TV channels and guide (needs a tuner or IPTV set up on the server)", if (isAdded) "Added" else "Add", {
+                        if (!isAdded) added(LiveSource.new(SourceKind.MEDIA_SERVER, server.displayName, server.id, null))
+                    })
+                }
+            }
+
             item { SectionTitle("M3U playlist") }
             item { TvTextField("Name", name, { name = it }, placeholder = "My provider") }
             item { TvTextField("Playlist URL or file", playlist, { playlist = it }, placeholder = "http://…/playlist.m3u", keyboardType = KeyboardType.Uri) }

@@ -78,6 +78,79 @@ class JellyfinClient(private val server: RemoteServer, private val deviceId: Str
         }
     }
 
+    // region Live TV
+
+    /** The server's Live TV channels; [Channel.url] is a jflive:// URI opened at play time. */
+    fun liveChannels(sourceId: String): List<com.sine.player.livetv.Channel> {
+        val json = get("/LiveTv/Channels?UserId=${enc(server.userId)}&EnableFavoriteSorting=true&EnableImages=true&EnableUserData=false")
+        val items = json.optJSONArray("Items") ?: return emptyList()
+        return (0 until items.length()).map { i ->
+            val o = items.getJSONObject(i)
+            val id = o.getString("Id")
+            com.sine.player.livetv.Channel(
+                id = "$sourceId:$id",
+                name = o.optString("Name"),
+                number = o.optString("ChannelNumber").ifEmpty { null },
+                group = null,
+                logo = o.optJSONObject("ImageTags")?.optString("Primary")?.takeIf { it.isNotEmpty() }?.let { tag ->
+                    "$base/Items/$id/Images/Primary?tag=${enc(tag)}&maxHeight=120"
+                },
+                url = "${LIVE_SCHEME}://${server.id}/$id.ts",
+                guideId = id,
+                sourceId = sourceId,
+            )
+        }
+    }
+
+    /** Guide entries keyed by Jellyfin channel id. */
+    fun livePrograms(fromMs: Long, toMs: Long): List<com.sine.player.livetv.Programme> {
+        val json = get(
+            "/LiveTv/Programs?UserId=${enc(server.userId)}&MinEndDate=${enc(isoDate(fromMs))}&MaxStartDate=${enc(isoDate(toMs))}" +
+                "&EnableImages=false&EnableTotalRecordCount=false&Fields=Overview&SortBy=StartDate",
+        )
+        val items = json.optJSONArray("Items") ?: return emptyList()
+        return (0 until items.length()).mapNotNull { i ->
+            val o = items.getJSONObject(i)
+            val start = parseDate(o.optString("StartDate")).takeIf { it > 0 } ?: return@mapNotNull null
+            com.sine.player.livetv.Programme(
+                channel = o.optString("ChannelId"),
+                startMs = start,
+                endMs = parseDate(o.optString("EndDate")).takeIf { it > start } ?: (start + 30 * 60_000),
+                title = o.optString("Name").ifEmpty { "No information" },
+                subtitle = o.optString("EpisodeTitle").ifEmpty { null },
+                description = o.optString("Overview").ifEmpty { null },
+            )
+        }
+    }
+
+    /**
+     * Asks the server to tune [channelId] and returns a direct MPEG-TS URL plus the live stream id
+     * to close afterwards. Untested against a real tuner.
+     */
+    fun openLiveStream(channelId: String): Pair<String, String?> {
+        val body = JSONObject()
+            .put("UserId", server.userId)
+            .put("AutoOpenLiveStream", true)
+            .put("EnableDirectPlay", true)
+            .put("EnableDirectStream", true)
+            .put("EnableTranscoding", false)
+        val json = Net.json(request("/Items/${enc(channelId)}/PlaybackInfo?UserId=${enc(server.userId)}").post(body.toString().toRequestBody(JSON)).build())
+        val source = json.optJSONArray("MediaSources")?.optJSONObject(0) ?: error("The server didn't offer a stream for this channel")
+        val liveStreamId = source.optString("LiveStreamId").ifEmpty { null }
+        val url = buildString {
+            append("$base/Videos/${enc(channelId)}/stream.ts?static=true&MediaSourceId=${enc(source.optString("Id"))}")
+            liveStreamId?.let { append("&LiveStreamId=${enc(it)}") }
+            append("&api_key=${enc(server.token)}")
+        }
+        return url to liveStreamId
+    }
+
+    fun closeLiveStream(liveStreamId: String) {
+        Net.execute(request("/LiveStreams/Close?LiveStreamId=${enc(liveStreamId)}").post(ByteArray(0).toRequestBody(null)).build()).close()
+    }
+
+    // endregion
+
     private fun get(path: String): JSONObject = Net.json(request(path).get().build())
 
     private fun request(path: String) = Request.Builder()
@@ -89,6 +162,10 @@ class JellyfinClient(private val server: RemoteServer, private val deviceId: Str
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
         const val TICKS_PER_MS = 10_000L
+        const val LIVE_SCHEME = "jflive"
+
+        fun isoDate(ms: Long): String =
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(ms))
 
         fun apiBase(address: String, emby: Boolean): String {
             val trimmed = address.trimEnd('/')

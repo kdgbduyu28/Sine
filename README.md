@@ -65,8 +65,10 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 - **M3U / IPTV playlists** from a URL or file, with groups, logos, channel numbers and an XMLTV guide (from `url-tvg` or a URL you enter, gzip OK).
 - **HDHomeRun tuners**, found automatically or by IP, with their guide.
+- **Jellyfin/Emby Live TV** channels and guide from a server you've already added (the server tunes the channel when you play it).
+- Playlists that need a User-Agent, Referer or Origin (`#EXTVLCOPT` lines or Kodi's `url|User-Agent=…`) work in both engines.
 - Channels with now/next, a four-hour guide grid, favourites (long-press OK), and channel ▲▼ zapping in the player.
-- Not yet: Jellyfin/Plex Live TV, catch-up, recording, and playlists that need custom HTTP headers (`url|User-Agent=…`).
+- Not yet: Plex Live TV, catch-up and recording.
 
 ## Phase 8: music and photos
 
@@ -153,7 +155,7 @@ The bundled FFmpeg and libmpv are GPL/LGPL, so a distributed build of Sine has t
 4. ~~Playback extras: skip intro/credits, chapters, seek thumbnails, audio delay, night mode, Blu-ray/DVD ISO.~~ Written.
 5. ~~Phone and living room: "play to" Sine, voice search, picture-in-picture, settings backup.~~ Written.
 6. ~~Release polish: per-device APKs, signing, GitHub Releases, update checks, log export.~~ Written.
-7. ~~Live TV: M3U/IPTV with a guide, HDHomeRun.~~ Written; Jellyfin/Plex Live TV not yet.
+7. ~~Live TV: M3U/IPTV with a guide, HDHomeRun, Jellyfin/Emby Live TV.~~ Written; Plex Live TV not yet.
 8. ~~Music and photos.~~ Done.
 9. ~~Downloads and offline.~~ Done.
 10. ~~Smart subtitles.~~ Done.

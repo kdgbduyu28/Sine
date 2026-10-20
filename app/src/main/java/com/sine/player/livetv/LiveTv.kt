@@ -19,9 +19,10 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.zip.GZIPInputStream
 
-enum class SourceKind(val label: String) { M3U("M3U playlist"), HDHOMERUN("HDHomeRun tuner") }
+enum class SourceKind(val label: String) { M3U("M3U playlist"), HDHOMERUN("HDHomeRun tuner"), MEDIA_SERVER("Jellyfin/Emby Live TV") }
 
-/** An IPTV playlist (URL or file) with an optional XMLTV guide, or an HDHomeRun tuner. */
+/** An IPTV playlist (URL or file) with an optional XMLTV guide, an HDHomeRun tuner, or a Jellyfin/Emby server ([LiveSource.address] = its id). */
+
 data class LiveSource(val id: String, val kind: SourceKind, val name: String, val address: String, val guideUrl: String?) {
     fun toJson(): JSONObject = JSONObject().put("id", id).put("kind", kind.name).put("name", name).put("address", address).put("guide", guideUrl ?: "")
 
@@ -119,6 +120,17 @@ class LiveTv(private val context: Context) {
                             }.onFailure { errors += "${source.name} guide: ${it.message}" }
                         }
                     }
+                    SourceKind.MEDIA_SERVER -> {
+                        val server = SineApp.instance.remoteServers.get(source.address) ?: error("server removed")
+                        val client = com.sine.player.mediaserver.JellyfinClient(server, SineApp.instance.settings.deviceId())
+                        val list = client.liveChannels(source.id)
+                        runCatching {
+                            client.livePrograms(from, to).groupBy { it.channel }.forEach { (channelId, p) ->
+                                allGuide.getOrPut("${source.id}:$channelId") { mutableListOf() } += p
+                            }
+                        }.onFailure { errors += "${source.name} guide: ${it.message}" }
+                        allChannels += list
+                    }
                     SourceKind.HDHOMERUN -> {
                         val device = HdHomeRun.device(source.address)
                         var list = HdHomeRun.channels(device, source.id)
@@ -138,10 +150,16 @@ class LiveTv(private val context: Context) {
             }
         }
         channels = allChannels
+        registerHeaders()
         guide = allGuide.mapValues { (_, list) -> list.sortedBy { it.startMs }.distinctBy { it.startMs } }
         refreshedAt = now
         lastError = errors.firstOrNull()?.let { if (errors.size > 1) "$it (and ${errors.size - 1} more)" else it }
         writeCache()
+    }
+
+    private fun registerHeaders() {
+        com.sine.player.net.HostHeaders.clear()
+        channels.forEach { com.sine.player.net.HostHeaders.register(it.url, it.headers) }
     }
 
     /** XMLTV ids first, then display names (so playlists without tvg-id still get a guide). */
@@ -182,6 +200,7 @@ class LiveTv(private val context: Context) {
         root.put("channels", JSONArray(channels.map { c ->
             JSONObject().put("id", c.id).put("name", c.name).put("number", c.number ?: "").put("group", c.group ?: "")
                 .put("logo", c.logo ?: "").put("url", c.url).put("guideId", c.guideId ?: "").put("source", c.sourceId)
+                .put("headers", JSONObject(c.headers))
         }))
         val g = JSONObject()
         guide.forEach { (id, list) ->
@@ -203,8 +222,10 @@ class LiveTv(private val context: Context) {
             Channel(
                 o.getString("id"), o.getString("name"), o.optString("number").ifEmpty { null }, o.optString("group").ifEmpty { null },
                 o.optString("logo").ifEmpty { null }, o.getString("url"), o.optString("guideId").ifEmpty { null }, o.getString("source"),
+                o.optJSONObject("headers")?.let { h -> h.keys().asSequence().associateWith { h.getString(it) } }.orEmpty(),
             )
         }
+        registerHeaders()
         val g = root.optJSONObject("guide") ?: return
         val cutoff = System.currentTimeMillis() - 3_600_000L
         guide = g.keys().asSequence().associateWith { id ->

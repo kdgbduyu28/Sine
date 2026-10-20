@@ -18,6 +18,8 @@ data class Channel(
     /** XMLTV channel id (tvg-id) used to match the guide. */
     val guideId: String?,
     val sourceId: String,
+    /** Headers the provider requires (User-Agent, Referer…), from `url|…` or #EXTVLCOPT. */
+    val headers: Map<String, String> = emptyMap(),
 )
 
 data class Programme(
@@ -42,6 +44,7 @@ object M3u {
         val channels = mutableListOf<Channel>()
         var info: String? = null
         var group: String? = null
+        val vlcOptions = mutableMapOf<String, String>()
         val ids = mutableMapOf<String, Int>()
         text.lineSequence().map { it.trim() }.forEach { line ->
             when {
@@ -51,6 +54,15 @@ object M3u {
                 }
                 line.startsWith("#EXTINF") -> info = line
                 line.startsWith("#EXTGRP:") -> group = line.substringAfter(':').trim()
+                line.startsWith("#EXTVLCOPT:") -> {
+                    val option = line.substringAfter(':')
+                    val value = option.substringAfter('=', "").trim()
+                    when (option.substringBefore('=').trim().lowercase()) {
+                        "http-user-agent" -> vlcOptions["User-Agent"] = value
+                        "http-referrer", "http-referer" -> vlcOptions["Referer"] = value
+                        "http-origin" -> vlcOptions["Origin"] = value
+                    }
+                }
                 line.isEmpty() || line.startsWith("#") -> Unit
                 else -> {
                     val extinf = info.orEmpty()
@@ -60,23 +72,36 @@ object M3u {
                     val guideId = attrs["tvg-id"]?.ifEmpty { null }
                     val base = "$sourceId:" + (guideId ?: number ?: name)
                     val count = ids.merge(base, 1, Int::plus)!!
+                    val (url, kodiHeaders) = splitKodi(line)
                     channels += Channel(
                         id = if (count == 1) base else "$base#$count",
                         name = name,
                         number = number?.ifEmpty { null },
                         group = (attrs["group-title"] ?: group)?.ifEmpty { null },
                         logo = attrs["tvg-logo"]?.ifEmpty { null },
-                        // Kodi-style "url|User-Agent=…" headers aren't supported; play the bare URL.
-                        url = line.substringBefore('|'),
+                        url = url,
                         guideId = guideId,
                         sourceId = sourceId,
+                        headers = vlcOptions + kodiHeaders,
                     )
                     info = null
                     group = null
+                    vlcOptions.clear()
                 }
             }
         }
         return M3uPlaylist(channels, guideUrl)
+    }
+
+    /** Kodi's `url|User-Agent=Foo&Referer=http%3A%2F%2Fbar` → bare URL + headers. */
+    fun splitKodi(line: String): Pair<String, Map<String, String>> {
+        val bar = line.indexOf('|')
+        if (bar < 0) return line to emptyMap()
+        val headers = line.substring(bar + 1).split('&').mapNotNull { part ->
+            val eq = part.indexOf('=')
+            if (eq <= 0) null else part.substring(0, eq).trim() to java.net.URLDecoder.decode(part.substring(eq + 1), "UTF-8").trim()
+        }.filter { it.first.isNotEmpty() && it.second.isNotEmpty() }.toMap()
+        return line.substring(0, bar) to headers
     }
 
     /** The display name follows the first comma outside quotes (names may contain commas). */

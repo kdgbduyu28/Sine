@@ -29,6 +29,7 @@ class LiveTvParsersTest {
         assertEquals("UK", bbc.group)
         assertEquals("bbc1.uk", bbc.guideId)
         assertEquals("http://example.com/live/bbc1.m3u8", bbc.url)
+        assertEquals(mapOf("User-Agent" to "Foo"), bbc.headers)
         assertEquals("src:bbc1.uk", bbc.id)
         assertEquals("News, 24", parsed.channels[1].name)
     }
@@ -37,6 +38,26 @@ class LiveTvParsersTest {
     fun `duplicate names get distinct ids`() {
         val ids = M3u.parse(playlist, "src").channels.drop(2).map { it.id }
         assertEquals(listOf("src:Same Name", "src:Same Name#2"), ids)
+    }
+
+    @Test
+    fun `reads EXTVLCOPT and Kodi headers`() {
+        val text = """
+            #EXTM3U
+            #EXTINF:-1,Sports
+            #EXTVLCOPT:http-user-agent=Mozilla/5.0
+            #EXTVLCOPT:http-referrer=http://site.example/
+            http://cdn.example/sports.m3u8|Origin=http%3A%2F%2Fsite.example
+            #EXTINF:-1,Plain
+            http://cdn.example/plain.ts
+        """.trimIndent()
+        val (sports, plain) = M3u.parse(text, "s").channels
+        assertEquals(
+            mapOf("User-Agent" to "Mozilla/5.0", "Referer" to "http://site.example/", "Origin" to "http://site.example"),
+            sports.headers,
+        )
+        assertEquals("http://cdn.example/sports.m3u8", sports.url)
+        assertEquals(emptyMap<String, String>(), plain.headers)
     }
 
     @Test

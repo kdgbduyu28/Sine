@@ -231,7 +231,8 @@ class SchemeDataSource(private val default: DataSource, private val byScheme: Ma
         private val httpFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Sine/1.0 (Android TV)")
             .setAllowCrossProtocolRedirects(true)
-        private val defaultFactory = DefaultDataSource.Factory(context, httpFactory)
+        // IPTV playlists can ask for a User-Agent/Referer per host.
+        private val defaultFactory = DefaultDataSource.Factory(context, com.sine.player.net.HostHeadersDataSource.Factory(httpFactory))
 
         override fun createDataSource(): DataSource {
             val webDav = WebDavDataSource(httpFactory.createDataSource())
@@ -243,6 +244,7 @@ class SchemeDataSource(private val default: DataSource, private val byScheme: Ma
                     "nfs" to NfsDataSource(),
                     "webdav" to webDav,
                     "webdavs" to webDav,
+                    com.sine.player.mediaserver.JellyfinClient.LIVE_SCHEME to com.sine.player.livetv.ServerLiveDataSource(httpFactory.createDataSource()),
                 ),
             )
         }
