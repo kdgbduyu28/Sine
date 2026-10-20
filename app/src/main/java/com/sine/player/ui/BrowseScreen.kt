@@ -157,7 +157,8 @@ fun BrowseScreen(
     }
     notice?.let { message ->
         LaunchedEffect(message) {
-            delay(3_000)
+            // Long results (speed test) need time to read; "Testing…" stays until the result replaces it.
+            delay(if (message.endsWith("…")) 30_000 else if (message.length > 60) 10_000 else 3_000)
             notice = null
         }
         Toast(message, Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
@@ -223,6 +224,17 @@ private fun entryActions(
             }
             entry.isVideo -> {
                 add(MenuAction("Play") { onPlay(entry.uri, entry.title, folder) })
+                if (entry.uri.substringBefore("://") !in setOf("file", "content")) {
+                    add(MenuAction("Test connection speed", "Reads part of the file to see if the network keeps up with it") {
+                        notify("Testing the connection…")
+                        scope.launch {
+                            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching { com.sine.player.net.SpeedTest.run(context, entry.playUri ?: entry.uri, entry.size) }
+                            }
+                            notify(result.fold({ com.sine.player.net.SpeedTest.verdict(it) }, { "Couldn't test: ${it.message}" }))
+                        }
+                    })
+                }
                 val existing = app.downloads.items.firstOrNull { it.sourceUri == entry.uri }
                 if (kids) {
                     // Kids can play and mark, not download or delete.
