@@ -54,6 +54,10 @@ data class Meta(
     val episodes: Map<String, EpisodeMeta> = emptyMap(),
     val fetchedAt: Long = System.currentTimeMillis(),
     val collection: MovieCollection? = null,
+    /** Age rating as given (PG-13, TV-Y7, 12A, R-16…) for the TV's region, falling back to the US. */
+    val certification: String? = null,
+    /** False for details saved before ratings existed; those get looked up again. */
+    val certificationKnown: Boolean = true,
     /** False for details saved before collections existed; those movies get looked up again. */
     val collectionKnown: Boolean = true,
 )
@@ -178,6 +182,7 @@ class LibraryStore(private val file: File) {
         fun encodeMeta(m: Meta): JSONObject = JSONObject().put("tmdb", m.tmdbId ?: 0).put("title", m.title ?: "").put("overview", m.overview ?: "")
             .put("poster", m.poster ?: "").put("backdrop", m.backdrop ?: "").put("rating", m.rating ?: 0.0)
             .put("genres", JSONArray(m.genres)).put("year", m.year ?: 0).put("at", m.fetchedAt)
+            .put("cert", m.certification ?: "")
             .put("collection", m.collection?.let { JSONObject().put("id", it.id).put("name", it.name).put("poster", it.poster ?: "").put("backdrop", it.backdrop ?: "") } ?: JSONObject())
             .put("episodes", JSONObject().apply { m.episodes.forEach { (k, e) -> put(k, JSONObject().put("name", e.name ?: "").put("overview", e.overview ?: "").put("still", e.still ?: "")) } })
 
@@ -202,6 +207,8 @@ class LibraryStore(private val file: File) {
                     MovieCollection(it.getInt("id"), it.optString("name"), it.optString("poster").ifEmpty { null }, it.optString("backdrop").ifEmpty { null })
                 },
                 collectionKnown = o.has("collection"),
+                certification = o.optString("cert").ifEmpty { null },
+                certificationKnown = o.has("cert"),
             )
         }
     }

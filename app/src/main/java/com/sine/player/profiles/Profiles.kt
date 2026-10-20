@@ -30,14 +30,21 @@ data class Profile(
     val bedtimeHour: Int? = null,
     /** …until this hour. */
     val wakeHour: Int = 7,
+    /** Highest age rating this profile may see (null = any); unrated titles stay visible. */
+    val maxAge: Int? = null,
 ) {
     val locked: Boolean get() = pinHash != null
 
     fun checkPin(pin: String): Boolean = pinHash == null || pinHash == Profiles.hash(id, pin)
 
-    fun allows(uri: String): Boolean = !kids || allowedRoots.any { root -> uri == root || uri.startsWith(root.trimEnd('/') + "/") }
+    fun allows(uri: String): Boolean =
+        (!kids || allowedRoots.any { root -> uri == root || uri.startsWith(root.trimEnd('/') + "/") }) &&
+            (maxAge == null || com.sine.player.library.AgeRatings.fits(ageLookup(uri), maxAge))
 
     companion object {
+        /** Set by the library at startup: a file's minimum age, or null when unknown. */
+        @Volatile var ageLookup: (String) -> Int? = { null }
+
         val colors = listOf(Color(0xFFF5C451), Color(0xFF6BC5F5), Color(0xFFF57A6B), Color(0xFF8BE08B), Color(0xFFC59BF5), Color(0xFFF59BD0))
     }
 }
@@ -138,6 +145,7 @@ class Profiles(context: Context) {
                     .put("kids", p.kids)
                     .put("roots", JSONArray(p.allowedRoots))
                     .put("daily", p.dailyMinutes)
+                    .put("maxAge", p.maxAge ?: -1)
                     .put("bedtime", p.bedtimeHour ?: -1)
                     .put("wake", p.wakeHour),
             )
@@ -159,6 +167,7 @@ class Profiles(context: Context) {
                     kids = o.optBoolean("kids"),
                     allowedRoots = (0 until roots.length()).map { roots.getString(it) },
                     dailyMinutes = o.optInt("daily"),
+                    maxAge = o.optInt("maxAge", -1).takeIf { it >= 0 },
                     bedtimeHour = o.optInt("bedtime", -1).takeIf { it >= 0 },
                     wakeHour = o.optInt("wake", 7),
                 )

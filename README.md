@@ -104,7 +104,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 ## Phase 11: profiles, kids and other TVs
 
 - **Profiles** with separate Continue watching and watched marks, optional PINs (number keys or ▲▼ on the remote) and "Who's watching?" on start.
-- **Kids profiles:** only folders you allow (hold OK on a folder → Allow for Mia), a daily time limit, a bedtime, and a parent PIN to grant 30 more minutes or leave the profile.
+- **Kids profiles:** only folders you allow (hold OK on a folder → Allow for Mia), a daily time limit, a bedtime, and a parent PIN to grant 30 more minutes or leave the profile. A profile can also be limited by **age rating** (TMDB certifications for the TV's country, e.g. PG-13, TV-Y7, 12A, R-13; unrated titles still show).
 - **Other TVs (multi-room, off by default):** Sine TVs find each other on the network and share a household code. Progress syncs per profile name, "Continue on Bedroom TV" hands off playback, Watch together keeps two TVs within about 0.7 s, and "Copy servers from …" sets up a new TV in one step.
 
 ## Phase 12: power tools

@@ -86,6 +86,7 @@ class SineApp : Application() {
         if (downloads.nextQueued() != null) Downloads.schedule(this)
         fileMemory = com.sine.player.data.FileMemory(this)
         library = com.sine.player.library.LibraryStore(File(filesDir, "library.json"))
+        com.sine.player.profiles.Profile.ageLookup = com.sine.player.library.Library::ageFor
         if (!library.isEmpty && System.currentTimeMillis() - library.scannedAt > 12 * 3_600_000L) {
             scope.launch { runCatching { com.sine.player.library.Library.scan() } }
         }

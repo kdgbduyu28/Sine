@@ -229,6 +229,14 @@ fun ProfileEditScreen(profileId: String?, onDone: () -> Unit) {
                         })
                     }
                     item {
+                        SettingRow(
+                            "Age rating",
+                            "Hide library titles rated above this (ratings come from TMDB for this TV's country; unrated titles still show)",
+                            com.sine.player.library.AgeRatings.label(profile.maxAge),
+                            { profile = profile.copy(maxAge = cycle(listOf<Int?>(null) + com.sine.player.library.AgeRatings.limits, profile.maxAge)) },
+                        )
+                    }
+                    item {
                         SettingRow("Bedtime", "No watching from this hour", profile.bedtimeHour?.let { "%d:00".format(it) } ?: "Off", {
                             profile = profile.copy(bedtimeHour = cycle(bedtimes, profile.bedtimeHour))
                         })

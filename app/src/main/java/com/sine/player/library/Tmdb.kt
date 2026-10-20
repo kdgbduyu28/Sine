@@ -5,6 +5,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 /**
  * themoviedb.org lookups with the user's own free key. Accepts either the short v3 "API key" or
@@ -26,6 +27,9 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
 
     private val isBearer get() = key.length > 60
 
+    /** Country for age ratings: the TV's region. */
+    private val region: String get() = Locale.getDefault().country.ifEmpty { "US" }
+
     /** The trailer's YouTube key; falls back to English videos when there are none in [language]. */
     fun trailer(tmdbId: Int, tv: Boolean): String? {
         val path = "/${if (tv) "tv" else "movie"}/$tmdbId/videos"
@@ -40,8 +44,8 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
             year?.let { put("year", it.toString()) }
         }).optJSONArray("results")
         val hit = best(results, year, "release_date") ?: return null
-        val details = get("/movie/${hit.getInt("id")}")
-        return meta(details, "title", "release_date")
+        val details = get("/movie/${hit.getInt("id")}", mapOf("append_to_response" to "release_dates"))
+        return meta(details, "title", "release_date").copy(certification = AgeRatings.movieCertification(details, region))
     }
 
     fun show(title: String, year: Int?, seasons: List<Int>): Meta? {
@@ -51,7 +55,7 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
         }).optJSONArray("results")
         val hit = best(results, year, "first_air_date") ?: return null
         val id = hit.getInt("id")
-        val details = get("/tv/$id")
+        val details = get("/tv/$id", mapOf("append_to_response" to "content_ratings"))
         val episodes = HashMap<String, EpisodeMeta>()
         seasons.forEach { season ->
             runCatching {
@@ -66,7 +70,7 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
                 }
             }
         }
-        return meta(details, "name", "first_air_date").copy(episodes = episodes)
+        return meta(details, "name", "first_air_date").copy(episodes = episodes, certification = AgeRatings.tvCertification(details, region))
     }
 
     /** Prefers an exact-year match, then TMDB's own ranking. */

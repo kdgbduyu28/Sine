@@ -119,6 +119,16 @@ object Library {
         )
     }
 
+    /**
+     * Minimum age for a library file (its movie's or show's rating), or null when unrated or not in
+     * the library. Kids profiles with an age limit use this through Profile.allows.
+     */
+    fun ageFor(uri: String): Int? {
+        store.movies.firstOrNull { it.file.uri == uri }?.let { return AgeRatings.age(store.meta[it.key]?.certification) }
+        store.shows.firstOrNull { uri == it.folder || uri.startsWith(it.folder.trimEnd('/') + "/") }?.let { return AgeRatings.age(store.meta[it.key]?.certification) }
+        return null
+    }
+
     /** Collections with at least two of the profile's movies, by name; movies in release order. */
     fun collections(): List<Pair<MovieCollection, List<Movie>>> {
         val profile = SineApp.instance.profiles.active
@@ -158,7 +168,7 @@ object Library {
         val month = 30L * 24 * 3_600_000
         store.movies.distinctBy { it.key }.forEach { movie ->
             val existing = store.meta[movie.key]
-            if (!force && existing != null && existing.collectionKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            if (!force && existing != null && existing.collectionKnown && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${movie.title}"
             runCatching { tmdb.movie(movie.title, movie.year) }.getOrNull()
                 ?.let { store.putMeta(movie.key, it) }
@@ -168,7 +178,7 @@ object Library {
             val existing = store.meta[show.key]
             val knownSeasons = existing?.episodes?.keys?.map { it.substringBefore(':').toInt() }?.toSet().orEmpty()
             val missingSeason = show.seasons.any { it !in knownSeasons }
-            if (!force && existing != null && !missingSeason && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            if (!force && existing != null && !missingSeason && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${show.title}"
             runCatching { tmdb.show(show.title, show.year, show.seasons) }.getOrNull()
                 ?.let { store.putMeta(show.key, it) }
