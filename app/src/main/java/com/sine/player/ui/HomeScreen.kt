@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.SdStorage
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -83,6 +84,7 @@ fun HomeScreen(
     onSearch: () -> Unit = {},
     onLiveTv: () -> Unit = {},
     onCollection: (Int) -> Unit = {},
+    onHistory: () -> Unit = {},
     onMovie: (String) -> Unit = {},
     onShow: (String) -> Unit = {},
 ) {
@@ -493,6 +495,7 @@ fun HomeScreen(
                         )
                     }
                     item { Tile("Search", "Movies, shows, episodes", Icons.Filled.Search, onClick = onSearch) }
+                    item { Tile("History", "Everything you've watched", Icons.Filled.History, onClick = onHistory) }
                     item {
                         val live = SineApp.instance.liveTv
                         Tile("Live TV", if (live.sources.isEmpty()) "IPTV, HDHomeRun" else "${live.channels.size} channels", Icons.Filled.LiveTv, onClick = onLiveTv)

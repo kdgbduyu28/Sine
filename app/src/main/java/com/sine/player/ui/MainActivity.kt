@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
                                 onSearch = { nav.navigate("search?q=") },
                                 onLiveTv = { nav.navigate("livetv") },
                                 onCollection = { nav.navigate("collection/$it") },
+                                onHistory = { nav.navigate("history") },
                             )
                         }
                         composable("search?q={q}") { entry ->
@@ -203,6 +204,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable("capabilities") { CapabilitiesScreen() }
+                        composable("history") { HistoryScreen(onPlay = { uri, title, folder, position -> playFrom(uri, title, folder, position, null) }) }
                         composable("collection/{id}") { entry ->
                             com.sine.player.library.CollectionScreen(
                                 entry.arguments?.getString("id")?.toIntOrNull() ?: 0,
