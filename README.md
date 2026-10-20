@@ -110,6 +110,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 ## Phase 12: power tools
 
 - **Up next, still watching, sleep timer:** a countdown card before the next episode (from the start of the credits when Sine knows them, else the last 20 seconds; OK plays now, Back stops after this one); after 3 episodes in a row with no button pressed Sine pauses and asks "Still watching?"; the moon button sets a sleep timer (15–90 minutes or end of this video) that pauses and lets the TV sleep.
+- **Subtitles:** the size and height settings now also move and resize picture subtitles (PGS from Blu-ray remuxes, VobSub, DVB) in Media3; "Clean up SDH subtitles" hides [sound effects], (laughs) and SPEAKER: labels in both engines.
 - **HDR on a TV without HDR:** when an HDR10 or HLG video meets a display that can't show it, Sine moves it to mpv, which tone-maps to SDR (BT.2446a with measured peaks) instead of showing washed-out colours. Switching back to Media3 by hand is respected.
 - **Buffer size:** Settings → Playback → Buffer (Normal / Large / Huge) reads further ahead on high-bitrate remuxes over Wi-Fi or SMB, sized to the TV's memory (Media3 up to 60% of the app heap, mpv up to a quarter of RAM).
 - **Best audio track:** in your audio language (or the file's default language), Sine starts on the richest track it can play (TrueHD Atmos, DTS:X/DTS-HD MA, E-AC3 Atmos, then lossy) and never on commentary or audio description, unless you picked a track for that file or season.

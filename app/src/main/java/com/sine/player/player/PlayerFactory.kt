@@ -176,7 +176,7 @@ private class SineRenderersFactory(
         out: ArrayList<Renderer>,
     ) {
         val built = ArrayList<Renderer>()
-        super.buildTextRenderers(context, output, outputLooper, extensionRendererMode, built)
+        super.buildTextRenderers(context, CueTransformOutput(output), outputLooper, extensionRendererMode, built)
         built.mapTo(out) { SubtitleDelayRenderer(it, subtitleDelayUs) }
     }
 }

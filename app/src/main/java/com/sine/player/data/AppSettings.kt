@@ -103,6 +103,8 @@ class AppSettings(context: Context) {
     var bufferSize by enumPref("buffer_size", com.sine.player.player.BufferSize.NORMAL)
     /** HDR on a TV without HDR: switch to mpv and tone-map to SDR. */
     var toneMapHdr by pref("tone_map_hdr", true)
+    /** Remove [sound effects], (laughs) and SPEAKER: labels from subtitles. */
+    var cleanSdh by pref("clean_sdh", false)
     /** Media server bitrate cap in Mbps (server transcodes to HLS); 0 = original file. */
     var serverQualityMbps by pref("server_quality_mbps", 0)
     /** Apply the cap only when the server isn't on the home network. */

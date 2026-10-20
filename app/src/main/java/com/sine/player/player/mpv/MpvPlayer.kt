@@ -545,6 +545,7 @@ class MpvPlayer(
             lib.setPropertyInt("sub-margin-y", (bottomFraction * 720).toInt())
             lib.setPropertyString("sub-border-style", if (boxed) "opaque-box" else "outline-and-shadow")
             lib.setPropertyString("sub-back-color", if (boxed) "#99000000" else "#00000000")
+            lib.setPropertyString("sub-filter-sdh", if (com.sine.player.SineApp.instance.settings.cleanSdh) "yes" else "no")
         }
     }
 

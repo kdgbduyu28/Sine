@@ -238,6 +238,11 @@ fun SettingsScreen(
                 })
             }
             item {
+                SettingRow("Clean up SDH subtitles", "Hide [door creaks], (laughs) and SPEAKER: labels when only SDH subtitles are available", onOff(s.cleanSdh), {
+                    s.cleanSdh = !s.cleanSdh
+                })
+            }
+            item {
                 val sites = listOfNotNull(
                     "OpenSubtitles".takeIf { s.openSubtitlesApiKey.isNotBlank() },
                     "Podnapisi".takeIf { s.podnapisiEnabled },
