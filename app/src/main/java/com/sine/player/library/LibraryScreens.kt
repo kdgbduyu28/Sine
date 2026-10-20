@@ -237,6 +237,13 @@ fun CollectionScreen(id: Int, onMovie: (String) -> Unit) {
     }
 }
 
+@Composable
+private fun MyListButton(listKey: String) {
+    val list = SineApp.instance.myList
+    list.version
+    OutlinedButton(onClick = { list.toggle(listKey) }) { Text(if (list.contains(listKey)) "✓ My list" else "+ My list") }
+}
+
 /** Opens the TMDB trailer in YouTube; hidden without a TMDB match or key. */
 @Composable
 private fun TrailerButton(tmdbId: Int?, tv: Boolean) {
@@ -343,6 +350,7 @@ fun MovieDetailScreen(
                 OutlinedButton(onClick = {
                     if (record?.watched == true) resume.forget(movie.file.uri) else resume.markWatched(movie.file.uri, movie.title, movie.file.folder)
                 }) { Text(if (record?.watched == true) "Mark unwatched" else "Mark watched") }
+                MyListButton(MyList.movieKey(key))
                 TrailerButton(meta?.tmdbId, tv = false)
             }
             Spacer(Modifier.height(16.dp))
@@ -392,6 +400,7 @@ fun ShowDetailScreen(
                     Button(onClick = { onPlay(next.file.uri, "${show.title} ${Library.episodeTitle(show, next)}", next.file.folder, nextRecord?.takeIf { it.resumable }?.positionMs) }, modifier = Modifier.focusRequester(focus)) {
                         Text((if (nextRecord?.resumable == true) "Resume " else "Play ") + "S%02dE%02d".format(next.season, next.number))
                     }
+                    MyListButton(MyList.showKey(key))
                     TrailerButton(meta?.tmdbId, tv = true)
                 }
                 Spacer(Modifier.height(16.dp))
@@ -400,6 +409,15 @@ fun ShowDetailScreen(
                         androidx.tv.material3.FilterChip(selected = s == season, onClick = { season = s }) { Text(if (s == 0) "Specials" else "Season $s") }
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+                val seasonEpisodes = SeasonMarks.season(show.episodes, season)
+                val seasonWatched = seasonEpisodes.isNotEmpty() && seasonEpisodes.all { resume.get(it.file.uri)?.watched == true }
+                OutlinedButton(onClick = {
+                    seasonEpisodes.forEach { e ->
+                        if (seasonWatched) resume.forget(e.file.uri) else resume.markWatched(e.file.uri, "${show.title} ${Library.episodeTitle(show, e)}", e.file.folder)
+                    }
+                }) { Text(if (seasonWatched) "Mark season unwatched" else "Mark season watched") }
+                Text("Hold OK on an episode to mark it and everything before it watched", style = MaterialTheme.typography.bodySmall, color = SineColors.muted, modifier = Modifier.padding(top = 6.dp))
                 MoreLikeThis(LibraryKind.SHOWS, key, onOpen = onShow, posterWidth = 110)
             }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -409,6 +427,11 @@ fun ShowDetailScreen(
                     ListItem(
                         selected = episode == next,
                         onClick = { onPlay(episode.file.uri, "${show.title} ${Library.episodeTitle(show, episode)}", episode.file.folder, record?.takeIf { it.resumable }?.positionMs) },
+                        onLongClick = {
+                            SeasonMarks.upTo(show.episodes, episode).forEach { e ->
+                                if (resume.get(e.file.uri)?.watched != true) resume.markWatched(e.file.uri, "${show.title} ${Library.episodeTitle(show, e)}", e.file.folder)
+                            }
+                        },
                         leadingContent = {
                             if (em?.still != null) {
                                 AsyncImage(em.still, null, SineImages.loader(context), Modifier.width(120.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)

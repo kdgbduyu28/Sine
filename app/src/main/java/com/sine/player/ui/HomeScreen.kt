@@ -349,6 +349,29 @@ fun HomeScreen(
                     }
                 }
             }
+            val myList = SineApp.instance.myList.keys().mapNotNull { k ->
+                when {
+                    k.startsWith("movie:") -> library.movie(k.removePrefix("movie:"))?.takeIf { profile.allows(it.file.uri) }?.let { m ->
+                        Triple(k, library.meta[m.key]?.title ?: m.title, com.sine.player.library.Library.posterFor(m.key, m.localPoster))
+                    }
+                    k.startsWith("show:") -> library.show(k.removePrefix("show:"))?.takeIf { profile.allows(it.folder) }?.let { sh ->
+                        Triple(k, library.meta[sh.key]?.title ?: sh.title, com.sine.player.library.Library.posterFor(sh.key, sh.localPoster))
+                    }
+                    else -> null
+                }
+            }
+            if (myList.isNotEmpty()) {
+                item { SectionTitle("My list") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(myList, key = { it.first }) { (k, title, poster) ->
+                            com.sine.player.library.PosterCard(title, null, poster, onClick = {
+                                if (k.startsWith("movie:")) onMovie(k.removePrefix("movie:")) else onShow(k.removePrefix("show:"))
+                            })
+                        }
+                    }
+                }
+            }
             val collections = com.sine.player.library.Library.collections()
             if (collections.isNotEmpty()) {
                 item { SectionTitle("Collections") }
