@@ -26,6 +26,9 @@ object Library {
     private const val MAX_DEPTH = 5
     private val posterNames = listOf("poster", "folder", "cover", "movie", "show")
 
+    /** Kodi nfo and fanart found by the last scan, by library key; applied after TMDB. */
+    private val nfoSources = java.util.concurrent.ConcurrentHashMap<String, Pair<String?, String?>>()
+
     suspend fun scan() {
         if (scanning != null) return
         scanning = "Scanning…"
@@ -50,6 +53,44 @@ object Library {
 
     private suspend fun list(uri: String): List<MediaEntry> = runCatching { Browsers.list(uri, showHidden = false) }.getOrDefault(emptyList())
 
+    /** Remembers a title's nfo and fanart (either may be missing). */
+    private fun noteNfo(key: String, folder: String, entries: List<MediaEntry>, videoName: String?) {
+        val names = entries.filter { !it.isDirectory }
+        val nfo = (if (videoName != null) Nfo.movieNfoNames(videoName) else listOf("tvshow.nfo"))
+            .firstNotNullOfOrNull { n -> names.firstOrNull { it.name.equals(n, ignoreCase = true) } }
+        val fanart = Nfo.fanartNames(videoName).firstNotNullOfOrNull { n ->
+            names.firstOrNull { it.isImage && MediaFiles.baseName(it.name).equals(n, ignoreCase = true) }
+        }
+        if (nfo != null || fanart != null) nfoSources[key] = nfo?.let { Browsers.child(folder, it.name) } to fanart?.let { Browsers.child(folder, it.name) }
+    }
+
+    /** Lays each title's nfo (and fanart) over its details; what the user curated wins. */
+    private fun applyNfo() {
+        nfoSources.forEach { (key, sources) ->
+            val (nfoUri, fanart) = sources
+            val info = nfoUri?.let { uri -> readText(uri)?.let(Nfo::parse) }
+            if (info != null || fanart != null) store.putMeta(key, Nfo.merge(store.meta[key], info, fanart))
+        }
+    }
+
+    /** Small text files (nfo) from any source Sine can read. */
+    private fun readText(uri: String, max: Int = 512 * 1024): String? = runCatching {
+        val source = com.sine.player.player.SchemeDataSource.Factory(SineApp.instance).createDataSource()
+        try {
+            source.open(androidx.media3.datasource.DataSpec(android.net.Uri.parse(uri)))
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(16 * 1024)
+            while (out.size() < max) {
+                val n = source.read(buffer, 0, buffer.size)
+                if (n < 0) break
+                out.write(buffer, 0, n)
+            }
+            out.toString("UTF-8")
+        } finally {
+            source.close()
+        }
+    }.getOrNull()
+
     private fun poster(folder: String, entries: List<MediaEntry>): String? =
         entries.filter { it.isImage }.firstOrNull { MediaFiles.baseName(it.name).lowercase() in posterNames }?.let { Browsers.child(folder, it.name) }
 
@@ -60,6 +101,7 @@ object Library {
             val poster = poster(folder, entries)
             entries.filter { it.isVideo && !NameParser.isSample(it.name, it.size) }.forEach { video ->
                 val parsed = NameParser.movie(video.name, folderName)
+                noteNfo(NameParser.key(parsed.title, parsed.year), folder, entries, video.name)
                 found += Movie(
                     key = NameParser.key(parsed.title, parsed.year),
                     title = parsed.title,
@@ -99,6 +141,7 @@ object Library {
             walk(folder, emptyList(), 0)
             if (episodes.isEmpty()) return@mapNotNull null
             val parsed = com.sine.player.subtitles.SubtitleQuery.from(name)
+            noteNfo(NameParser.key(parsed.text, parsed.year), folder, list(folder), null)
             Show(
                 key = NameParser.key(parsed.text, parsed.year),
                 title = parsed.text,
@@ -162,6 +205,12 @@ object Library {
 
     /** Looks up TMDB details for anything that doesn't have them yet (needs the user's key). */
     suspend fun fetchMetadata(force: Boolean = false) = withContext(Dispatchers.IO) {
+        fetchTmdb(force)
+        // Kodi nfo files override TMDB, so they go on top of every refresh.
+        applyNfo()
+    }
+
+    private suspend fun fetchTmdb(force: Boolean) = withContext(Dispatchers.IO) {
         val key = SineApp.instance.settings.tmdbApiKey.trim()
         if (key.isEmpty()) return@withContext
         val tmdb = Tmdb(key)

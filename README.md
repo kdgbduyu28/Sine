@@ -36,6 +36,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 - **Library folders** from any source (hold OK on a folder → Add to library as Movies or TV shows). Titles, years, seasons and episodes come from file and folder names; samples and extras are skipped. Rescans every 12 hours or on demand.
 - **Posters and details** from TMDB with your own API key (v3 key or v4 token); a local `poster.jpg`/`folder.jpg` works without one.
+- **Kodi .nfo files** (`movie.nfo`, `<video>.nfo`, `tvshow.nfo`, or a TMDB link) and `fanart.jpg` are read during scans: title, plot, rating, genres, age rating and backdrop from them win over TMDB, and work without a TMDB key.
 - **From your servers:** a home row with Jellyfin/Emby Continue watching and Next up, and Plex On Deck, including things started in other apps; episodes play with their season as the playlist.
 - **My list:** "+ My list" on movie and show pages saves titles to a per-profile home row. On show pages, mark a whole season watched/unwatched, or hold OK on an episode to mark it and everything before it watched.
 - **Collections:** films from the same TMDB collection grouped on the home screen and on their own page, in release order (needs two or more in your library).
