@@ -142,3 +142,9 @@ internal fun cycle(values: List<Float>, current: Float, direction: Int): Float {
     val index = values.indexOfFirst { kotlin.math.abs(it - current) < 0.001f }.let { if (it < 0) values.size / 2 else it }
     return values[(index + direction).coerceIn(0, values.lastIndex)]
 }
+
+/** Steps through [values] and wraps around (for choices like colours rather than sizes). */
+internal fun <T> cycle(values: List<T>, current: T, direction: Int): T {
+    val index = values.indexOf(current).coerceAtLeast(0)
+    return values[Math.floorMod(index + direction, values.size)]
+}

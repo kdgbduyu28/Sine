@@ -41,6 +41,9 @@ interface Engine {
     /** mpv draws subtitles itself, so the style settings have to reach it directly. */
     fun applySubtitleStyle(scale: Float, bottomFraction: Float, boxed: Boolean) = Unit
 
+    /** Text colour and edge; Media3 takes them from the subtitle view instead. */
+    fun applySubtitleColors(color: SubtitleColor, edge: SubtitleEdge, boxed: Boolean) = Unit
+
     /** mpv keeps the aspect ratio inside the frame unless told to stretch. */
     fun setStretch(stretch: Boolean) = Unit
 

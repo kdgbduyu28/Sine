@@ -66,6 +66,8 @@ class AppSettings(context: Context) {
     var subtitleScale by pref("subtitle_scale", 1.0f)
     var subtitleBottom by pref("subtitle_bottom", 0.08f)
     var subtitleBackground by pref("subtitle_background", false)
+    var subtitleColor by enumPref("subtitle_color", com.sine.player.player.SubtitleColor.WHITE)
+    var subtitleEdge by enumPref("subtitle_edge", com.sine.player.player.SubtitleEdge.OUTLINE)
     var seekStepSeconds by pref("seek_step", 10)
     var autoplayNext by pref("autoplay_next", true)
     var upNextCard by pref("up_next_card", true)

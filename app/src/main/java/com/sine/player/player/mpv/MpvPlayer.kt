@@ -549,6 +549,17 @@ class MpvPlayer(
         }
     }
 
+    fun applySubtitleColors(color: SubtitleColor, edge: SubtitleEdge, boxed: Boolean) {
+        val lib = mpv ?: return
+        runCatching {
+            lib.setPropertyString("sub-color", color.hex)
+            if (!boxed) {
+                lib.setPropertyDouble("sub-border-size", edge.mpvBorder)
+                lib.setPropertyDouble("sub-shadow-offset", edge.mpvShadow)
+            }
+        }
+    }
+
     fun setAudioDelay(ms: Long) {
         mpv?.setPropertyDouble("audio-delay", ms / 1000.0)
     }
@@ -656,6 +667,8 @@ class MpvEngine(private val mpv: MpvPlayer, private val resolve: (String) -> Str
         mpv.applySubtitleStyle(scale, bottomFraction, boxed)
 
     override fun setStretch(stretch: Boolean) = mpv.setStretch(stretch)
+
+    override fun applySubtitleColors(color: SubtitleColor, edge: SubtitleEdge, boxed: Boolean) = mpv.applySubtitleColors(color, edge, boxed)
 
     override fun setAudioDelay(ms: Long) = mpv.setAudioDelay(ms)
 

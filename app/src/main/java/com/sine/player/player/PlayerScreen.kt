@@ -339,6 +339,8 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
     val scale = settings.subtitleScale
     val bottom = settings.subtitleBottom
     val boxed = settings.subtitleBackground
+    val color = settings.subtitleColor
+    val edge = settings.subtitleEdge
     val aspect = session.aspect
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -357,6 +359,7 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
             session.engine?.let { engine ->
                 engine.setStretch(aspect == AspectMode.FILL)
                 engine.applySubtitleStyle(scale, bottom, boxed)
+                engine.applySubtitleColors(color, edge, boxed)
             }
             view.resizeMode = when (aspect) {
                 AspectMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -371,10 +374,10 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
                 setBottomPaddingFraction(bottom)
                 setStyle(
                     CaptionStyleCompat(
-                        AndroidColor.WHITE,
+                        color.argb,
                         if (boxed) 0x99000000.toInt() else AndroidColor.TRANSPARENT,
                         AndroidColor.TRANSPARENT,
-                        if (boxed) CaptionStyleCompat.EDGE_TYPE_NONE else CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                        if (boxed) CaptionStyleCompat.EDGE_TYPE_NONE else edge.captionEdge,
                         AndroidColor.BLACK,
                         null,
                     ),
@@ -787,6 +790,18 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 ChoiceRow("Background box", "Easier to read on bright scenes", settings.subtitleBackground, {
                     settings.subtitleBackground = !settings.subtitleBackground
                 })
+            }
+            item {
+                StepperRow("Colour", settings.subtitleColor.label, onStep = { d, _ ->
+                    settings.subtitleColor = cycle(SubtitleColor.entries.toList(), settings.subtitleColor, d)
+                })
+            }
+            if (!settings.subtitleBackground) {
+                item {
+                    StepperRow("Edge", settings.subtitleEdge.label, onStep = { d, _ ->
+                        settings.subtitleEdge = cycle(SubtitleEdge.entries.toList(), settings.subtitleEdge, d)
+                    })
+                }
             }
         }
 
