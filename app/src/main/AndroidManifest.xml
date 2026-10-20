@@ -167,6 +167,16 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Rescans the library when a USB drive that holds library folders is plugged in. -->
+        <receiver
+            android:name=".library.UsbRescanReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_MOUNTED" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".livetv.RecordingAlarmReceiver"
             android:exported="false" />
