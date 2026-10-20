@@ -186,3 +186,14 @@ object MediaFiles {
         return if (unit <= 1) "${value.toInt()} ${units[unit]}" else String.format(java.util.Locale.US, "%.1f %s", value, units[unit])
     }
 }
+
+enum class BrowseSort(val label: String) { NAME("name"), NEWEST("newest first"), LARGEST("largest first") }
+
+/** Folder list order: folders stay first; files by name (as listed), date or size. */
+object BrowseSorting {
+    fun apply(entries: List<MediaEntry>, sort: BrowseSort): List<MediaEntry> = when (sort) {
+        BrowseSort.NAME -> entries
+        BrowseSort.NEWEST -> entries.sortedWith(compareByDescending<MediaEntry> { it.isDirectory }.thenByDescending { it.modified })
+        BrowseSort.LARGEST -> entries.sortedWith(compareByDescending<MediaEntry> { it.isDirectory }.thenByDescending { it.size })
+    }
+}

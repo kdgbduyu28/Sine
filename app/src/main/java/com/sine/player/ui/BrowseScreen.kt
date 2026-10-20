@@ -22,6 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -79,7 +82,8 @@ fun BrowseScreen(
         runCatching { focus.requestFocus() }
     }
 
-    val list = entries
+    val sort = SineApp.instance.settings.browseSort
+    val list = entries?.let { com.sine.player.source.BrowseSorting.apply(it, sort) }
     val counts = list?.let {
         val folders = it.count { e -> e.isDirectory }
         val videos = it.size - folders
@@ -88,10 +92,25 @@ fun BrowseScreen(
             if (videos > 0) "$videos video${if (videos == 1) "" else "s"}" else null,
         ).joinToString(" · ")
     }
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    // Menu on the remote cycles the order (name, newest, largest).
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+            if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.key == androidx.compose.ui.input.key.Key.Menu) {
+                val settings = SineApp.instance.settings
+                settings.browseSort = com.sine.player.source.BrowseSort.entries[(settings.browseSort.ordinal + 1) % com.sine.player.source.BrowseSort.entries.size]
+                true
+            } else {
+                false
+            }
+        },
+    ) {
     Page(
         title = Browsers.displayName(uri),
-        subtitle = listOfNotNull(Browsers.describe(uri).ifEmpty { null }, counts?.ifEmpty { null }).joinToString("   ·   "),
+        subtitle = listOfNotNull(
+            Browsers.describe(uri).ifEmpty { null },
+            counts?.ifEmpty { null },
+            "sorted by ${sort.label} (Menu to change)".takeIf { list != null && list.size > 1 },
+        ).joinToString("   ·   "),
     ) {
         when {
             error != null -> Message("Couldn't open this folder", error!!) {

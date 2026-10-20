@@ -99,6 +99,8 @@ class AppSettings(context: Context) {
     var startCard by pref("start_card", true)
     /** While playing, Back asks for a second press before stopping. */
     var confirmExit by pref("confirm_exit", true)
+    /** File browser order; Menu on the remote cycles it. */
+    var browseSort by enumPref("browse_sort", com.sine.player.source.BrowseSort.NAME)
     var fileThumbnails by enumPref("file_thumbnails", com.sine.player.ui.ThumbnailMode.LOCAL)
     /** Home row with Continue watching / Next up from Jellyfin, Emby and Plex. */
     var serverHomeRow by pref("server_home_row", true)
