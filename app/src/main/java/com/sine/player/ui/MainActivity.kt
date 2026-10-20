@@ -118,6 +118,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("backups") { com.sine.player.backup.BackupScreen() }
+                        composable("about") { com.sine.player.diagnostics.AboutScreen() }
                         composable("browse/{uri}") { entry ->
                             val uri = Uri.decode(entry.arguments?.getString("uri").orEmpty())
                             BrowseScreen(
@@ -163,6 +164,7 @@ class MainActivity : ComponentActivity() {
                                 onRemoteButtons = { nav.navigate("remote") },
                                 onLibrary = { nav.navigate("library/settings") },
                                 onBackups = { nav.navigate("backups") },
+                                onAbout = { nav.navigate("about") },
                             )
                         }
                         composable("remote") { RemoteButtonsScreen() }

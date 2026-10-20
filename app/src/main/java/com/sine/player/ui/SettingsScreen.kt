@@ -27,7 +27,13 @@ import com.sine.player.data.ResumeMode
 import com.sine.player.source.Storage
 
 @Composable
-fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit = {}, onLibrary: () -> Unit = {}, onBackups: () -> Unit = {}) {
+fun SettingsScreen(
+    onOpenSubtitles: () -> Unit = {},
+    onRemoteButtons: () -> Unit = {},
+    onLibrary: () -> Unit = {},
+    onBackups: () -> Unit = {},
+    onAbout: () -> Unit = {},
+) {
     val s = SineApp.instance.settings
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
@@ -353,7 +359,7 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit
 
             item { SectionTitle("About") }
             item {
-                SettingRow("Sine", "Media3 with FFmpeg audio decoding, libmpv as the fallback engine", BuildConfig.VERSION_NAME, {})
+                SettingRow("Sine", "Updates, logs and crash reports", BuildConfig.VERSION_NAME, onAbout)
             }
         }
     }

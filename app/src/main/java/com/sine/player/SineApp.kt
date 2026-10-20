@@ -62,6 +62,7 @@ class SineApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        com.sine.player.diagnostics.Diagnostics.installCrashHandler(this)
         settings = AppSettings(this)
         profiles = Profiles(this)
         resume = ResumeStore(this) { profiles.activeId }
