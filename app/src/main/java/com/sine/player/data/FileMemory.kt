@@ -35,6 +35,7 @@ data class FileChoices(
     val subtitle: TrackChoice? = null,
     val subtitlesOff: Boolean = false,
     val subtitleDelayMs: Long = 0,
+    val audioDelayMs: Long = 0,
     val aspect: AspectMode? = null,
     val speed: Float = 1f,
     /** "MEDIA3" / "MPV" when switched by hand. */
@@ -45,6 +46,7 @@ data class FileChoices(
         .put("sub", subtitle?.toJson())
         .put("subOff", subtitlesOff)
         .put("delay", subtitleDelayMs)
+        .put("adelay", audioDelayMs)
         .put("aspect", aspect?.name ?: "")
         .put("speed", speed.toDouble())
         .put("engine", engine ?: "")
@@ -55,6 +57,7 @@ data class FileChoices(
             subtitle = TrackChoice.fromJson(o.optJSONObject("sub")),
             subtitlesOff = o.optBoolean("subOff"),
             subtitleDelayMs = o.optLong("delay"),
+            audioDelayMs = o.optLong("adelay"),
             aspect = AspectMode.entries.firstOrNull { it.name == o.optString("aspect") },
             speed = o.optDouble("speed", 1.0).toFloat(),
             engine = o.optString("engine").ifEmpty { null },

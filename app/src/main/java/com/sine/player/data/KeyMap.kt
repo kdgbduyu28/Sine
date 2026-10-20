@@ -25,6 +25,10 @@ enum class RemoteAction(val label: String) {
     FIND_SUBTITLES("Find subtitles online"),
     SWITCH_ENGINE("Switch engine (Media3 / mpv)"),
     INFO("Playback info"),
+    CHAPTER_NEXT("Next chapter"),
+    CHAPTER_PREVIOUS("Previous chapter"),
+    SKIP_SEGMENT("Skip intro / credits"),
+    SCREENSHOT("Screenshot"),
 }
 
 /**

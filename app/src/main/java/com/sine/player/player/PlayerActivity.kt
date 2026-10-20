@@ -30,6 +30,7 @@ import com.sine.player.source.MediaEntry
 import com.sine.player.source.MediaFiles
 import com.sine.player.ui.theme.SineTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 @UnstableApi
@@ -162,12 +163,12 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     private fun titleFor(uri: String): String = MediaFiles.baseName(Browsers.displayName(uri))
 
-    override fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long): Engine {
+    override fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long, audioDelayUs: () -> Long): Engine {
         if (kind == EngineKind.MPV) {
             runCatching { return MpvEngine(MpvPlayer(this, options, ::mpvUri), ::mpvUri) }
                 .onFailure { session.notice = "mpv couldn't start (${it.message ?: it.javaClass.simpleName}). Using Media3." }
         }
-        return Media3Engine(PlayerFactory.create(this, options, subtitleDelayUs))
+        return Media3Engine(PlayerFactory.create(this, options, subtitleDelayUs, audioDelayUs))
     }
 
     /** mpv opens http(s) and local files itself; everything else goes through the local stream proxy. */
@@ -178,6 +179,14 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
             "file" -> parsed.path ?: uri
             null -> uri
             else -> SineApp.instance.streamProxy.urlFor(uri)
+        }
+    }
+
+    override fun onItemReady(item: PlayItem) {
+        lifecycleScope.launch {
+            val chapters = withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { MkvChapters.read(this@PlayerActivity, item.playUri) }.getOrDefault(emptyList()) }
+            val segments = withContext(kotlinx.coroutines.Dispatchers.IO) { SineApp.instance.mediaServers.segments(item.uri) }
+            session.setChapters(item.uri, chapters, segments)
         }
     }
 

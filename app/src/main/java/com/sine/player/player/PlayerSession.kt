@@ -50,7 +50,7 @@ data class TrackOption(
     val index: Int,
 )
 
-enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, SUBTITLE_SYNC, SUBTITLE_SECOND, SUBTITLE_TRANSLATE, VIDEO, INFO }
+enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, SUBTITLE_SYNC, SUBTITLE_SECOND, SUBTITLE_TRANSLATE, VIDEO, INFO, CHAPTERS }
 
 data class ResumePrompt(val positionMs: Long, val durationMs: Long)
 
@@ -67,7 +67,10 @@ class PlayerSession(
     private val memory: com.sine.player.data.FileMemory? = null,
 ) {
     interface Host {
-        fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long): Engine
+        fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long, audioDelayUs: () -> Long): Engine
+
+        /** Tracks are known for a new item: the host looks up chapters and skippable segments. */
+        fun onItemReady(item: PlayItem) = Unit
         fun onFrameRate(fps: Float)
         fun onFinished(ended: Boolean)
         fun onProgress(item: PlayItem, positionMs: Long, durationMs: Long, state: ProgressState) = Unit
@@ -127,6 +130,65 @@ class PlayerSession(
         aspect = mode
         remember { it.copy(aspect = mode) }
     }
+
+    /** Positive = sound later than the picture. */
+    var audioDelayMs by mutableLongStateOf(0)
+        private set
+
+    fun setAudioDelay(ms: Long) {
+        audioDelayMs = ms.coerceIn(-2_000, 2_000)
+        engine?.setAudioDelay(audioDelayMs)
+        remember { it.copy(audioDelayMs = audioDelayMs) }
+    }
+
+    var chapters by mutableStateOf<List<Chapter>>(emptyList())
+        private set
+    var segments by mutableStateOf<List<Segment>>(emptyList())
+        private set
+
+    /** The intro/credits segment playing right now, if skipping is on. */
+    var activeSegment by mutableStateOf<Segment?>(null)
+        private set
+    private val autoSkipped = mutableSetOf<Segment>()
+    private var chaptersFor: String? = null
+
+    fun setChapters(forUri: String, found: List<Chapter>, serverSegments: List<Segment>) {
+        if (current?.uri != forUri) return
+        chapters = found
+        segments = serverSegments.ifEmpty { Segments.fromChapters(found, durationMs) }
+    }
+
+    fun skipSegment() {
+        val segment = activeSegment ?: return
+        if (segment.type == SegmentType.CREDITS && hasNext) next() else seekTo(segment.endMs)
+        activeSegment = null
+    }
+
+    fun seekToChapter(direction: Int) {
+        if (chapters.isEmpty()) return
+        val now = positionMs
+        val target = if (direction > 0) {
+            chapters.firstOrNull { it.startMs > now + 1000 }
+        } else {
+            chapters.lastOrNull { it.startMs < now - 3000 } ?: chapters.first()
+        } ?: return
+        seekTo(target.startMs)
+        notice = target.title.ifBlank { "Chapter ${chapters.indexOf(target) + 1}" }
+    }
+
+    data class Picture(val brightness: Int = 0, val contrast: Int = 0, val saturation: Int = 0, val gamma: Int = 0)
+
+    var picture by mutableStateOf(Picture())
+        private set
+
+    /** Returns false when the current engine can't adjust the picture (Media3). */
+    fun setPicture(value: Picture): Boolean {
+        picture = value
+        return engine?.setPicture(value.brightness, value.contrast, value.saturation, value.gamma) ?: false
+    }
+
+    /** The SurfaceView Media3 renders into, for screenshots. */
+    var surfaceView: android.view.SurfaceView? = null
 
     /** Stats overlay (blue button by default). */
     var showStats by mutableStateOf(false)
@@ -191,6 +253,8 @@ class PlayerSession(
         val remembered = if (settings.rememberPerFile) memory?.get(item.uri)?.engine else null
         val kind = when {
             !MpvSupport.available -> EngineKind.MEDIA3
+            // Disc images only play through mpv (libbluray / libdvdnav).
+            item.playUri.substringBefore('?').endsWith(".iso", ignoreCase = true) -> EngineKind.MPV
             remembered == EngineKind.MPV.name || (remembered == null && settings.engineMode == EngineMode.MPV) -> EngineKind.MPV
             else -> EngineKind.MEDIA3
         }
@@ -203,11 +267,13 @@ class PlayerSession(
         restoredFor = null
         resetEngineInfo()
         val options = PlayerFactory.options(settings, baseLayerOnly)
-        val built = host.createEngine(kind, options) { subtitleDelayMs * 1000 }
+        val built = host.createEngine(kind, options, { subtitleDelayMs * 1000 }, { audioDelayMs * 1000 })
         val p = built.player
         p.addListener(listener)
         (p as? ExoPlayer)?.addAnalyticsListener(analytics)
         built.setSubtitleDelay(subtitleDelayMs)
+        built.setAudioDelay(audioDelayMs)
+        if (picture != Picture()) built.setPicture(picture.brightness, picture.contrast, picture.saturation, picture.gamma)
         built.applySubtitleStyle(settings.subtitleScale, settings.subtitleBottom, settings.subtitleBackground)
         p.setMediaItems(items.map(::toMediaItem), index, positionMs)
         p.setPlaybackSpeed(speed)
@@ -470,6 +536,18 @@ class PlayerSession(
 
     private var restoredFor: String? = null
 
+    private fun updateSegment() {
+        val mode = settings.skipSegments
+        val segment = if (mode == com.sine.player.data.SkipMode.OFF) null else segments.firstOrNull { it.contains(positionMs) && positionMs < it.endMs - 2_000 }
+        if (segment != null && mode == com.sine.player.data.SkipMode.AUTO && segment.type != SegmentType.CREDITS && autoSkipped.add(segment)) {
+            seekTo(segment.endMs)
+            notice = "Skipped ${segment.type.name.lowercase()}"
+            activeSegment = null
+            return
+        }
+        activeSegment = segment
+    }
+
     /** Once per item, re-applies what was picked last time this file played. */
     private fun restoreChoices(newTracks: Tracks, skipSubtitle: Boolean) {
         val item = current ?: return
@@ -489,6 +567,7 @@ class PlayerSession(
                 if (saved.subtitlesOff) selectTrack(C.TRACK_TYPE_TEXT, null) else saved.subtitle?.let { apply(C.TRACK_TYPE_TEXT, it) }
             }
             if (saved.subtitleDelayMs != 0L) setSubtitleDelay(saved.subtitleDelayMs)
+            if (saved.audioDelayMs != 0L) setAudioDelay(saved.audioDelayMs)
             saved.aspect?.let { aspect = it }
             if (saved.speed != 1f) setPlaybackSpeed(saved.speed)
         } finally {
@@ -532,6 +611,10 @@ class PlayerSession(
             "Speed ${speed}×"
         }
         com.sine.player.data.RemoteAction.SWITCH_ENGINE -> { switchEngine(); null }
+        com.sine.player.data.RemoteAction.CHAPTER_NEXT -> { seekToChapter(1); null }
+        com.sine.player.data.RemoteAction.CHAPTER_PREVIOUS -> { seekToChapter(-1); null }
+        com.sine.player.data.RemoteAction.SKIP_SEGMENT -> { skipSegment(); null }
+        com.sine.player.data.RemoteAction.SCREENSHOT -> null
         com.sine.player.data.RemoteAction.FIND_SUBTITLES, com.sine.player.data.RemoteAction.INFO -> null
     }
 
@@ -551,6 +634,7 @@ class PlayerSession(
             droppedFrames = it.droppedFrames
             cacheSeconds = it.cacheSeconds
         }
+        updateSegment()
         val sampleNow = System.currentTimeMillis()
         if (sampleNow - lastRateSampleAt >= 1000) {
             val elapsed = if (lastRateSampleAt == 0L) 1000 else sampleNow - lastRateSampleAt
@@ -645,6 +729,15 @@ class PlayerSession(
             if (maybeSwitchForUnsupportedTracks(newTracks)) return
             val addedSubtitle = selectPendingSubtitle(newTracks)
             restoreChoices(newTracks, skipSubtitle = addedSubtitle)
+            current?.let { item ->
+                if (newTracks.groups.isNotEmpty() && chaptersFor != item.uri) {
+                    chaptersFor = item.uri
+                    chapters = emptyList()
+                    segments = emptyList()
+                    autoSkipped.clear()
+                    host.onItemReady(item)
+                }
+            }
             checkPreferredSubtitles(newTracks)
             val video = newTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
             val videoIndex = video?.let { g -> (0 until g.length).firstOrNull { g.isTrackSelected(it) } }

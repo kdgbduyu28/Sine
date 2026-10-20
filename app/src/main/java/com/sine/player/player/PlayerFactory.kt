@@ -36,13 +36,15 @@ data class EngineOptions(
     val mpvDirectOutput: Boolean = false,
     /** mpv only: options from Settings → mpv and the user's mpv.conf. */
     val mpvExtra: Map<String, String> = emptyMap(),
+    val nightMode: Boolean = false,
+    val dialogueBoost: Boolean = false,
 )
 
 @UnstableApi
 object PlayerFactory {
 
-    fun create(context: Context, options: EngineOptions, subtitleDelayUs: () -> Long): ExoPlayer {
-        val renderers = SineRenderersFactory(context, options.passthrough, subtitleDelayUs)
+    fun create(context: Context, options: EngineOptions, subtitleDelayUs: () -> Long, audioDelayUs: () -> Long = { 0L }): ExoPlayer {
+        val renderers = SineRenderersFactory(context, options, subtitleDelayUs, audioDelayUs)
             // Platform decoders first; FFmpeg steps in for TrueHD/DTS/etc. when the TV has no decoder.
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             .setEnableDecoderFallback(true)
@@ -84,7 +86,10 @@ object PlayerFactory {
     }
 
     fun options(settings: AppSettings, dolbyVisionBaseLayer: Boolean) = EngineOptions(
-        passthrough = settings.passthrough,
+        // Night mode and dialogue boost work on decoded audio, so they switch passthrough off.
+        passthrough = settings.passthrough && !settings.nightMode && !settings.dialogueBoost,
+        nightMode = settings.nightMode,
+        dialogueBoost = settings.dialogueBoost,
         tunneling = settings.tunneling,
         dolbyVisionBaseLayer = dolbyVisionBaseLayer,
         audioLanguage = settings.audioLanguage.ifEmpty { null },
@@ -99,7 +104,7 @@ object PlayerFactory {
                 settings.mpvInterpolation,
                 settings.mpvShaders.split('|').filter { it.isNotBlank() }.toSet(),
             )
-        }.getOrDefault(emptyMap()),
+        }.getOrDefault(emptyMap()) + (if (settings.nightMode) mapOf("af" to AudioBoostProcessor.MPV_NIGHT_FILTER) else emptyMap()),
     )
 
     /**
@@ -118,9 +123,26 @@ object PlayerFactory {
 @UnstableApi
 private class SineRenderersFactory(
     context: Context,
-    private val passthrough: Boolean,
+    private val options: EngineOptions,
     private val subtitleDelayUs: () -> Long,
+    private val audioDelayUs: () -> Long,
 ) : DefaultRenderersFactory(context) {
+    private val passthrough = options.passthrough
+
+    override fun buildVideoRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        eventHandler: android.os.Handler,
+        eventListener: androidx.media3.exoplayer.video.VideoRendererEventListener,
+        allowedVideoJoiningTimeMs: Long,
+        out: ArrayList<Renderer>,
+    ) {
+        val built = ArrayList<Renderer>()
+        super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, built)
+        built.mapTo(out) { AvOffsetRenderer(it, audioDelayUs) }
+    }
 
     override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
         val builder = DefaultAudioSink.Builder(context)
@@ -130,6 +152,9 @@ private class SineRenderersFactory(
             // Report a PCM-only output so every format gets decoded (platform decoder or FFmpeg).
             @Suppress("DEPRECATION")
             builder.setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
+        }
+        if (options.nightMode || options.dialogueBoost) {
+            builder.setAudioProcessors(arrayOf(AudioBoostProcessor(options.nightMode, options.dialogueBoost)))
         }
         return builder.build()
     }

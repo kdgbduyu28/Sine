@@ -5,7 +5,7 @@ object MediaFiles {
 
     val videoExtensions = setOf(
         "mkv", "mp4", "m4v", "avi", "mov", "wmv", "ts", "m2ts", "mts", "webm", "flv",
-        "mpg", "mpeg", "vob", "3gp", "ogv", "rmvb", "divx", "asf", "f4v", "mk3d",
+        "mpg", "mpeg", "vob", "3gp", "ogv", "rmvb", "divx", "asf", "f4v", "mk3d", "iso",
     )
 
     val subtitleExtensions = setOf("srt", "ass", "ssa", "vtt", "ttml", "dfxp")

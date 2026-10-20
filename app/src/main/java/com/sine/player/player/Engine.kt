@@ -47,6 +47,15 @@ interface Engine {
     /** Adds a subtitle file while playing. Returns false when the engine needs a rebuild instead. */
     fun addSubtitle(uri: String, label: String, language: String?): Boolean = false
 
+    /** Positive values make the sound come later. Media3 reads the offset from the session instead. */
+    fun setAudioDelay(ms: Long) = Unit
+
+    /** Brightness/contrast/saturation/gamma, −100..100; false when the engine can't adjust the picture. */
+    fun setPicture(brightness: Int, contrast: Int, saturation: Int, gamma: Int): Boolean = false
+
+    /** Saves the current video frame; null when the engine can't (Media3 uses PixelCopy instead). */
+    fun screenshot(path: String): Boolean = false
+
     /** Polled by the session; null when the engine reports through listeners instead. */
     fun stats(): EngineStats? = null
 

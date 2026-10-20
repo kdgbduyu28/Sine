@@ -93,7 +93,26 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit
                 })
             }
 
+            item {
+                SettingRow("Night mode", "Evens out loud effects and quiet speech. Turns off passthrough while on.", onOff(s.nightMode), { s.nightMode = !s.nightMode })
+            }
+            item {
+                SettingRow("Dialogue boost", "Raises the centre (voice) channel of 5.1/7.1 mixes. Turns off passthrough while on.", onOff(s.dialogueBoost), {
+                    s.dialogueBoost = !s.dialogueBoost
+                })
+            }
+
             item { SectionTitle("Playback") }
+            item {
+                SettingRow("Skip intros and credits", s.skipSegments.description + " (uses chapter names or Jellyfin's markers)", s.skipSegments.label, {
+                    s.skipSegments = next(com.sine.player.data.SkipMode.entries, s.skipSegments)
+                })
+            }
+            item {
+                SettingRow("Seek previews", "Show a picture while skipping through a video (slower over the network)", onOff(s.seekPreviews), {
+                    s.seekPreviews = !s.seekPreviews
+                })
+            }
             item {
                 SettingRow("Resume", "What to do when you reopen something you didn't finish", s.resumeMode.label, {
                     s.resumeMode = next(ResumeMode.entries, s.resumeMode)

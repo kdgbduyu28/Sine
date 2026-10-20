@@ -61,6 +61,23 @@ class JellyfinClient(private val server: RemoteServer, private val deviceId: Str
         Net.execute(request(path).post(body.toString().toRequestBody(JSON)).build()).close()
     }
 
+    /** Intro/credits/recap markers (Jellyfin 10.10+ with a segment provider plugin). */
+    fun segments(itemId: String): List<com.sine.player.player.Segment> {
+        if (emby) return emptyList()
+        val items = get("/MediaSegments/${enc(itemId)}").optJSONArray("Items") ?: return emptyList()
+        return (0 until items.length()).mapNotNull { i ->
+            val o = items.getJSONObject(i)
+            val type = when (o.optString("Type").lowercase()) {
+                "intro" -> com.sine.player.player.SegmentType.INTRO
+                "outro" -> com.sine.player.player.SegmentType.CREDITS
+                "recap" -> com.sine.player.player.SegmentType.RECAP
+                "preview" -> com.sine.player.player.SegmentType.PREVIEW
+                else -> return@mapNotNull null
+            }
+            com.sine.player.player.Segment(type, o.optLong("StartTicks") / TICKS_PER_MS, o.optLong("EndTicks") / TICKS_PER_MS)
+        }
+    }
+
     private fun get(path: String): JSONObject = Net.json(request(path).get().build())
 
     private fun request(path: String) = Request.Builder()

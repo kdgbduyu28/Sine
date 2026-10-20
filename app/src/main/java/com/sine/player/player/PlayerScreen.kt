@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -113,6 +114,8 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
     var panel by remember { mutableStateOf<Panel?>(null) }
     var lastInput by remember { mutableLongStateOf(0L) }
     val swallowUp = remember { mutableSetOf<Key>() }
+    val screenshotContext = LocalContext.current
+    val screenshotScope = rememberCoroutineScope()
 
     fun showOverlay() {
         overlay = true
@@ -136,6 +139,9 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
         keyMap.actionFor(code)?.let { action ->
             when (action) {
                 com.sine.player.data.RemoteAction.FIND_SUBTITLES -> panel = Panel.SUBTITLE_SEARCH
+                com.sine.player.data.RemoteAction.SCREENSHOT -> screenshotScope.launch {
+                    session.notice = runCatching { "Saved to ${takeScreenshot(screenshotContext, session, session.surfaceView)}" }.getOrElse { "Screenshot failed: ${it.message}" }
+                }
                 com.sine.player.data.RemoteAction.INFO -> panel = if (panel == Panel.INFO) null else Panel.INFO
                 else -> session.perform(action)?.let { session.notice = it }
             }
@@ -177,7 +183,10 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             when (key) {
                 Key.DirectionLeft -> { session.scrub(-stepMs * speedUp); return consume() }
                 Key.DirectionRight -> { session.scrub(stepMs * speedUp); return consume() }
-                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> if (session.activeSegment != null) {
+                    session.skipSegment()
+                    return consume()
+                } else {
                     session.togglePlay()
                     showOverlay()
                     return consume()
@@ -250,6 +259,14 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             ControlsOverlay(session, stepMs, playFocus, onPanel = { panel = it })
         }
 
+        if (session.seekTargetMs != null) {
+            SeekThumbnail(session, Modifier.align(Alignment.BottomCenter).padding(bottom = 190.dp))
+        }
+
+        if (panel == null && !overlay) {
+            SkipButton(session, Modifier.align(Alignment.BottomEnd))
+        }
+
         if (!overlay && session.seekTargetMs != null) {
             SeekPreview(session, Modifier.align(Alignment.BottomCenter))
         }
@@ -316,6 +333,7 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
                 AspectMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
                 AspectMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             }
+            session.surfaceView = view.videoSurfaceView as? android.view.SurfaceView
             view.subtitleView?.apply {
                 setApplyEmbeddedStyles(true)
                 setApplyEmbeddedFontSizes(false)
@@ -421,6 +439,9 @@ private fun ControlsOverlay(
                 ControlButton(Icons.Filled.Subtitles, "Subtitles", onClick = { onPanel(Panel.SUBTITLES) })
                 ControlButton(Icons.Filled.Tune, "Subtitle style", onClick = { onPanel(Panel.SUBTITLE_STYLE) })
                 ControlButton(Icons.Filled.AspectRatio, "Picture", onClick = { onPanel(Panel.VIDEO) })
+                if (session.chapters.isNotEmpty()) {
+                    ControlButton(Icons.Filled.FormatListNumbered, "Chapters", onClick = { onPanel(Panel.CHAPTERS) })
+                }
                 ControlButton(Icons.Filled.Info, "Info", onClick = { onPanel(Panel.INFO) })
             }
         }
@@ -501,6 +522,11 @@ private fun SeekBar(session: PlayerSession, stepMs: Long) {
             drawRoundRect(SineColors.accent, size = Size(size.width * position.coerceIn(0f, 1f), size.height), cornerRadius = radius)
             if (focused) {
                 drawCircle(Color.White, radius = size.height * 1.3f, center = Offset(size.width * position.coerceIn(0f, 1f), size.height / 2))
+            }
+            // Chapter marks.
+            session.chapters.drop(1).forEach { chapter ->
+                val x = size.width * (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
+                drawLine(Color.Black.copy(alpha = 0.7f), Offset(x, 0f), Offset(x, size.height), strokeWidth = 2.dp.toPx())
             }
         }
     }
@@ -642,6 +668,26 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                     }
                 }
                 session.audioOutput?.let { output -> item { InfoRow("Output", output) } }
+                item {
+                    StepperRow(
+                        "Audio sync",
+                        Time.formatDelay(session.audioDelayMs),
+                        hint = "◀ sound earlier · later ▶",
+                        onStep = { d, repeat -> session.setAudioDelay(session.audioDelayMs + d * if (repeat > 6) 200L else 50L) },
+                    )
+                }
+                item {
+                    ChoiceRow("Night mode", "Quieter explosions, clearer speech (turns off passthrough)", settings.nightMode, {
+                        settings.nightMode = !settings.nightMode
+                        session.switchEngine(session.engineKind, if (settings.nightMode) "Night mode on" else "Night mode off")
+                    })
+                }
+                item {
+                    ChoiceRow("Dialogue boost", "Louder centre channel on 5.1/7.1 (Media3; turns off passthrough)", settings.dialogueBoost, {
+                        settings.dialogueBoost = !settings.dialogueBoost
+                        session.switchEngine(session.engineKind, if (settings.dialogueBoost) "Dialogue boost on" else "Dialogue boost off")
+                    })
+                }
             }
         }
 
@@ -722,7 +768,12 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                     )
                 }
             }
+            pictureRows(session)
             engineRows(session)
+        }
+
+        Panel.CHAPTERS -> SidePanel("Chapters", focusIndex = session.chapters.indexOfLast { it.startMs <= session.positionMs }.coerceAtLeast(0)) {
+            chapterRows(session) { onPanel(null) }
         }
 
         Panel.INFO -> SidePanel("Playback info", focusIndex = 0) {

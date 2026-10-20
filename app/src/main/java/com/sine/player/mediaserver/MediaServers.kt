@@ -98,6 +98,14 @@ class MediaServers(
         }
     }
 
+    /** Skippable segments the server knows about for an item (Jellyfin only). */
+    fun segments(uri: String): List<com.sine.player.player.Segment> {
+        val (serverId, kind, id) = MediaServerUris.parse(uri) ?: return emptyList()
+        if (kind != "i" || id == null) return emptyList()
+        val server = servers.get(serverId)?.takeIf { it.kind == ServerKind.JELLYFIN } ?: return emptyList()
+        return runCatching { JellyfinClient(server, deviceId()).segments(id) }.getOrDefault(emptyList())
+    }
+
     /** Sends playback progress to the server in the background; non-server URIs are ignored. */
     fun report(uri: String, positionMs: Long, durationMs: Long, state: ProgressState) {
         val (serverId, kind, id) = MediaServerUris.parse(uri) ?: return

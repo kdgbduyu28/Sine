@@ -293,7 +293,24 @@ class MpvPlayer(
         playbackState = Player.STATE_BUFFERING
         lib.setPropertyBoolean("pause", !playWhenReady)
         lib.setPropertyString("start", if (startMs > 0) String.format(Locale.US, "%.3f", startMs / 1000.0) else "none")
-        lib.command(arrayOf("loadfile", resolve(uri), "replace"))
+        val target = resolve(uri)
+        lib.command(arrayOf("loadfile", discTarget(lib, target) ?: target, "replace"))
+    }
+
+    /**
+     * Disc images play through libbluray/libdvdnav, which need a local file: point mpv's disc
+     * device at the ISO and open bd:// or dvd:// (a Blu-ray image is bigger than a dual-layer DVD).
+     */
+    private fun discTarget(lib: MPVLib, target: String): String? {
+        if (!target.endsWith(".iso", ignoreCase = true) || target.contains("://")) return null
+        val size = java.io.File(target).length()
+        return if (size > 9_000_000_000L) {
+            lib.setPropertyString("bluray-device", target)
+            "bd://"
+        } else {
+            lib.setPropertyString("dvd-device", target)
+            "dvd://"
+        }
     }
 
     private fun addExternalSubtitles() {
@@ -520,6 +537,25 @@ class MpvPlayer(
         }
     }
 
+    fun setAudioDelay(ms: Long) {
+        mpv?.setPropertyDouble("audio-delay", ms / 1000.0)
+    }
+
+    fun setPicture(brightness: Int, contrast: Int, saturation: Int, gamma: Int) {
+        val lib = mpv ?: return
+        runCatching {
+            lib.setPropertyInt("brightness", brightness)
+            lib.setPropertyInt("contrast", contrast)
+            lib.setPropertyInt("saturation", saturation)
+            lib.setPropertyInt("gamma", gamma)
+        }
+    }
+
+    fun screenshot(path: String): Boolean = runCatching {
+        mpv?.command(arrayOf("screenshot-to-file", path, "video"))
+        true
+    }.getOrDefault(false)
+
     fun setStretch(stretch: Boolean) {
         mpv?.setPropertyString("keepaspect", if (stretch) "no" else "yes")
     }
@@ -608,6 +644,15 @@ class MpvEngine(private val mpv: MpvPlayer, private val resolve: (String) -> Str
         mpv.applySubtitleStyle(scale, bottomFraction, boxed)
 
     override fun setStretch(stretch: Boolean) = mpv.setStretch(stretch)
+
+    override fun setAudioDelay(ms: Long) = mpv.setAudioDelay(ms)
+
+    override fun setPicture(brightness: Int, contrast: Int, saturation: Int, gamma: Int): Boolean {
+        mpv.setPicture(brightness, contrast, saturation, gamma)
+        return true
+    }
+
+    override fun screenshot(path: String): Boolean = mpv.screenshot(path)
 
     override fun addSubtitle(uri: String, label: String, language: String?): Boolean {
         mpv.addSubtitle(resolve(uri), label, language)

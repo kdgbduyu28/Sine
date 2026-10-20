@@ -39,6 +39,12 @@ enum class AutoSubtitles(val label: String, val description: String) {
     MISSING("When missing", "If a video has no subtitles in your language, download the best match automatically"),
 }
 
+enum class SkipMode(val label: String, val description: String) {
+    OFF("Off", "Never offer to skip"),
+    BUTTON("Show a button", "Press OK during an intro or credits to skip it"),
+    AUTO("Skip automatically", "Jump over intros and recaps without asking"),
+}
+
 enum class MpvOutput(val label: String, val description: String) {
     GPU("GPU", "mpv draws video and subtitles itself. Works everywhere; HDR is tone-mapped to SDR."),
     DIRECT("Direct", "Hardware decoder renders straight to the screen, keeping HDR. mpv can't draw subtitles in this mode."),
@@ -82,6 +88,10 @@ class AppSettings(context: Context) {
     private var storedHouseholdCode by pref("household_code", "")
     private var storedDeviceName by pref("device_name", "")
     var rememberPerFile by pref("remember_per_file", true)
+    var skipSegments by enumPref("skip_segments", SkipMode.BUTTON)
+    var nightMode by pref("night_mode", false)
+    var dialogueBoost by pref("dialogue_boost", false)
+    var seekPreviews by pref("seek_previews", true)
     var tmdbApiKey by pref("tmdb_api_key", "")
     var launcherRow by pref("launcher_row", true)
     var traktClientId by pref("trakt_client_id", "")
