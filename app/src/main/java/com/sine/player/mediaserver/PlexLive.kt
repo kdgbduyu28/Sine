@@ -112,7 +112,7 @@ class PlexLive(private val server: RemoteServer, private val deviceId: String) {
         }
 
         /**
-         * Makes every URI in an HLS playlist absolute (with the token), so the player can fetch
+         * Makes every URI in an HLS playlist absolute (with the token on Plex's own URLs), so the player can fetch
          * segments and variant playlists straight from Plex even though it opened plexlive://.
          */
         fun rewritePlaylist(text: String, playlistUrl: String, token: String): String {
@@ -124,7 +124,9 @@ class PlexLive(private val server: RemoteServer, private val deviceId: String) {
                     uri.startsWith("/") -> origin + uri
                     else -> dir + uri
                 }
-                return if (full.contains("X-Plex-Token=")) full else full + (if (full.contains('?')) "&" else "?") + "X-Plex-Token=" + enc(token)
+                // The token only goes to the Plex server itself, never to another host.
+                if (!full.startsWith("$origin/") || full.contains("X-Plex-Token=")) return full
+                return full + (if (full.contains('?')) "&" else "?") + "X-Plex-Token=" + enc(token)
             }
             return text.lineSequence().joinToString("\n") { line ->
                 val trimmed = line.trim()

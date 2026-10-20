@@ -66,6 +66,7 @@ class PlexLiveTest {
         assertEquals("#EXT-X-KEY:METHOD=AES-128,URI=\"http://plex.local:32400/livetv/sessions/ab12/c3/key.bin?X-Plex-Token=tok\"", out[1])
         assertEquals("http://plex.local:32400/livetv/sessions/ab12/c3/00001.ts?X-Plex-Token=tok", out[3])
         assertEquals("http://plex.local:32400/livetv/sessions/ab12/c3/00002.ts?X-Plex-Token=tok", out[4])
-        assertEquals("https://cdn.example/x.ts?a=1&X-Plex-Token=tok", out[5])
+        // Other hosts never get the token.
+        assertEquals("https://cdn.example/x.ts?a=1", out[5])
     }
 }
