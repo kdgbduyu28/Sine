@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Update APKs handed to the system installer. -->
 <paths>
+    <!-- Update APKs handed to the system installer. -->
     <cache-path name="updates" path="updates/" />
+    <!-- "Open with another app": internal storage and USB drives. -->
+    <root-path name="storage" path="/storage/" />
+    <root-path name="mnt" path="/mnt/" />
 </paths>

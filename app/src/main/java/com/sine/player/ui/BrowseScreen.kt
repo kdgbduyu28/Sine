@@ -224,6 +224,12 @@ private fun entryActions(
             }
             entry.isVideo -> {
                 add(MenuAction("Play") { onPlay(entry.uri, entry.title, folder) })
+                if (!kids) {
+                    add(MenuAction("Open with another app", "VLC, Kodi, MX Player… (SMB shares are passed with their login)") {
+                        runCatching { OpenWith.open(context, entry.uri, entry.playUri, entry.title) }
+                            .onFailure { notify("No other video player is installed") }
+                    })
+                }
                 if (entry.uri.substringBefore("://") !in setOf("file", "content")) {
                     add(MenuAction("Test connection speed", "Reads part of the file to see if the network keeps up with it") {
                         notify("Testing the connection…")
