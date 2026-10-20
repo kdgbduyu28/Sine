@@ -35,7 +35,7 @@ import com.sine.player.ui.theme.SineColors
 
 /** Landscape cards for what the media servers would offer as Continue watching / Next up. */
 @Composable
-fun ServerHomeRow(items: List<ServerHomeItem>, onPlay: (ServerHomeItem) -> Unit) {
+fun ServerHomeRow(items: List<ServerHomeItem>, markNextUp: Boolean = true, onPlay: (ServerHomeItem) -> Unit) {
     val context = LocalContext.current
     val showServer = items.map { it.serverName }.distinct().size > 1
     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -62,7 +62,7 @@ fun ServerHomeRow(items: List<ServerHomeItem>, onPlay: (ServerHomeItem) -> Unit)
                     }
                 }
                 Text(item.title, style = MaterialTheme.typography.titleSmall, color = SineColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                val detail = listOfNotNull(item.subtitle, if (item.progress == 0f) "Next up" else null, item.serverName.takeIf { showServer }).joinToString(" · ")
+                val detail = listOfNotNull(item.subtitle, if (markNextUp && item.progress == 0f) "Next up" else null, item.serverName.takeIf { showServer }).joinToString(" · ")
                 if (detail.isNotEmpty()) {
                     Text(detail, style = MaterialTheme.typography.bodySmall, color = SineColors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

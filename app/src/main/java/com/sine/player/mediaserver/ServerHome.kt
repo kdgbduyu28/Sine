@@ -20,6 +20,8 @@ data class ServerHomeItem(
     val progress: Float,
     val lastPlayedAt: Long,
     val serverName: String,
+    /** When the server added it; for the Recently added row. */
+    val addedAt: Long = 0,
 )
 
 /**
@@ -31,6 +33,33 @@ object ServerHome {
     fun load(server: RemoteServer, deviceId: String): List<ServerHomeItem> = when (server.kind) {
         ServerKind.PLEX -> plex(server, deviceId)
         ServerKind.JELLYFIN, ServerKind.EMBY -> jellyfin(server, deviceId)
+        else -> emptyList()
+    }
+
+    /** The newest videos on a server (Jellyfin/Emby Items/Latest, Plex recentlyAdded). */
+    fun recentlyAdded(server: RemoteServer, deviceId: String): List<ServerHomeItem> = when (server.kind) {
+        ServerKind.PLEX -> {
+            val base = server.address.trimEnd('/')
+            val json = Net.json(
+                PlexClient.headers(Request.Builder().url("$base/library/recentlyAdded?X-Plex-Container-Start=0&X-Plex-Container-Size=20"), deviceId)
+                    .header("X-Plex-Token", server.token).build(),
+            )
+            parsePlex(json, server, base)
+        }
+        ServerKind.JELLYFIN, ServerKind.EMBY -> {
+            val emby = server.kind == ServerKind.EMBY
+            val base = JellyfinClient.apiBase(server.address, emby)
+            // Items/Latest returns a bare array; GroupItems=false lists episodes rather than their series.
+            val array = Net.jsonArray(
+                Request.Builder()
+                    .url("$base/Users/${enc(server.userId)}/Items/Latest?Limit=20&GroupItems=false&IncludeItemTypes=Movie,Episode&Fields=MediaSources,MediaStreams,Path,DateCreated&EnableImages=true")
+                    .header(if (emby) "X-Emby-Authorization" else "Authorization", JellyfinClient.authorization(deviceId, server.token))
+                    .header("X-Emby-Token", server.token)
+                    .header("Accept", "application/json")
+                    .build(),
+            )
+            parseJellyfin(JSONObject().put("Items", array), server, base)
+        }
         else -> emptyList()
     }
 
@@ -77,6 +106,7 @@ object ServerHome {
                 progress = remote?.let { if (it.durationMs > 0) (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) else 0f } ?: 0f,
                 lastPlayedAt = remote?.lastPlayedAt ?: 0,
                 serverName = server.displayName,
+                addedAt = JellyfinClient.parseDate(o.optString("DateCreated")),
             )
         }
     }
@@ -108,6 +138,7 @@ object ServerHome {
                 progress = remote?.let { if (it.durationMs > 0) (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) else 0f } ?: 0f,
                 lastPlayedAt = remote?.lastPlayedAt ?: 0,
                 serverName = server.displayName,
+                addedAt = o.optLong("addedAt") * 1000,
             )
         }
     }

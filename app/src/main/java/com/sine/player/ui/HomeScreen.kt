@@ -125,6 +125,7 @@ fun HomeScreen(
         }
     }
     var serverItems by remember { mutableStateOf(emptyList<com.sine.player.mediaserver.ServerHomeItem>()) }
+    var serverRecent by remember { mutableStateOf(emptyList<com.sine.player.mediaserver.ServerHomeItem>()) }
     LaunchedEffect(Unit) {
         val app = SineApp.instance
         if (!app.settings.serverHomeRow || app.profiles.active.kids) return@LaunchedEffect
@@ -134,6 +135,11 @@ fun HomeScreen(
                     runCatching { com.sine.player.mediaserver.ServerHome.load(server, app.settings.deviceId()) }.getOrDefault(emptyList())
                 },
             ).take(30)
+        }
+        serverRecent = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            app.remoteServers.servers.filter { it.kind.isMediaServer }.flatMap { server ->
+                runCatching { com.sine.player.mediaserver.ServerHome.recentlyAdded(server, app.settings.deviceId()) }.getOrDefault(emptyList())
+            }.distinctBy { it.entry.uri }.sortedByDescending { it.addedAt }.take(30)
         }
     }
     LaunchedEffect(Unit) {
@@ -271,6 +277,15 @@ fun HomeScreen(
                 item { SectionTitle("From your servers") }
                 item {
                     com.sine.player.mediaserver.ServerHomeRow(fromServers) { s ->
+                        onPlayFrom(s.entry.uri, s.title + (s.subtitle?.let { " $it" } ?: ""), s.folder, s.entry.remote?.positionMs ?: 0, null)
+                    }
+                }
+            }
+
+            if (serverRecent.isNotEmpty()) {
+                item { SectionTitle("Recently added") }
+                item {
+                    com.sine.player.mediaserver.ServerHomeRow(serverRecent, markNextUp = false) { s ->
                         onPlayFrom(s.entry.uri, s.title + (s.subtitle?.let { " $it" } ?: ""), s.folder, s.entry.remote?.positionMs ?: 0, null)
                     }
                 }
