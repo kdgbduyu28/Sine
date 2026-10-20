@@ -34,6 +34,11 @@ enum class AutoDelete(val label: String, val days: Int?) {
     WEEK("7 days after watching", 7),
 }
 
+enum class AutoSubtitles(val label: String, val description: String) {
+    OFF("Off", "Only search when you ask from the Subtitles panel"),
+    MISSING("When missing", "If a video has no subtitles in your language, download the best match automatically"),
+}
+
 enum class MpvOutput(val label: String, val description: String) {
     GPU("GPU", "mpv draws video and subtitles itself. Works everywhere; HDR is tone-mapped to SDR."),
     DIRECT("Direct", "Hardware decoder renders straight to the screen, keeping HDR. mpv can't draw subtitles in this mode."),
@@ -69,6 +74,10 @@ class AppSettings(context: Context) {
     var downloadTarget by pref("download_target", "")
     var downloadWhen by enumPref("download_when", DownloadWhen.NOW)
     var downloadAutoDelete by enumPref("download_auto_delete", AutoDelete.NEVER)
+    var autoSubtitles by enumPref("auto_subtitles", AutoSubtitles.MISSING)
+    var avoidHearingImpaired by pref("avoid_sdh", true)
+    var podnapisiEnabled by pref("podnapisi", true)
+    var subdlApiKey by pref("subdl_api_key", "")
     private var storedDeviceId by pref("device_id", "")
 
     /** Stable id that media servers use to tell this TV apart from other clients. */

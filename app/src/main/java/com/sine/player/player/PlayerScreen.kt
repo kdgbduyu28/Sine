@@ -95,9 +95,6 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.sine.player.data.AppSettings
 import com.sine.player.data.AspectMode
-import com.sine.player.subtitles.SubtitleQuery
-import com.sine.player.subtitles.SubtitleResult
-import com.sine.player.subtitles.SubtitleSearch
 import com.sine.player.ui.theme.SineColors
 import com.sine.player.util.Time
 import kotlinx.coroutines.delay
@@ -224,6 +221,7 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             .focusable(),
     ) {
         VideoSurface(session, settings)
+        SecondarySubtitles(session, Modifier.align(Alignment.TopCenter))
 
         if (session.playbackState == Player.STATE_BUFFERING && session.resumePrompt == null) {
             Spinner(Modifier.align(Alignment.Center))
@@ -612,12 +610,18 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                         )
                     }
                 }
-                item { ActionRow("Search OpenSubtitles…") { onPanel(Panel.SUBTITLE_SEARCH) } }
-                item { ActionRow("Style & timing…") { onPanel(Panel.SUBTITLE_STYLE) } }
+                item { ActionRow("Find subtitles online…") { onPanel(Panel.SUBTITLE_SEARCH) } }
+                item { ActionRow("Fix timing (sync)…") { onPanel(Panel.SUBTITLE_SYNC) } }
+                item { ActionRow(if (session.secondaryLabel != null) "Second subtitle: ${session.secondaryLabel}" else "Second subtitle…") { onPanel(Panel.SUBTITLE_SECOND) } }
+                item { ActionRow("Translate…") { onPanel(Panel.SUBTITLE_TRANSLATE) } }
+                item { ActionRow("Style & delay…") { onPanel(Panel.SUBTITLE_STYLE) } }
             }
         }
 
         Panel.SUBTITLE_SEARCH -> SubtitleSearchPanel(session, onDone = { onPanel(Panel.SUBTITLES) })
+        Panel.SUBTITLE_SYNC -> SubtitleSyncPanel(session, onDone = { onPanel(Panel.SUBTITLES) })
+        Panel.SUBTITLE_SECOND -> SecondSubtitlePanel(session, onDone = { onPanel(Panel.SUBTITLES) })
+        Panel.SUBTITLE_TRANSLATE -> TranslatePanel(session, onDone = { onPanel(Panel.SUBTITLES) })
 
         Panel.SUBTITLE_STYLE -> SidePanel("Subtitle style & timing", focusIndex = 0) {
             item {
@@ -700,75 +704,6 @@ private fun LazyListScope.engineRows(session: PlayerSession) {
     item { InfoRow("Engine", if (kind == EngineKind.MPV) "mpv (libmpv)" else "Media3 (ExoPlayer)") }
     if (session.canSwitchEngine) {
         item { ActionRow("Switch engine to ${kind.other.label}") { session.switchEngine() } }
-    }
-}
-
-private sealed interface SearchState {
-    data object NoKey : SearchState
-    data object Searching : SearchState
-    data class Failed(val message: String) : SearchState
-    data class Results(val results: List<SubtitleResult>) : SearchState
-    data class Downloading(val result: SubtitleResult) : SearchState
-}
-
-@UnstableApi
-@Composable
-private fun SubtitleSearchPanel(session: PlayerSession, onDone: () -> Unit) {
-    val context = LocalContext.current
-    val search = remember { SubtitleSearch(context.applicationContext, session.settings) }
-    val item = session.current
-    val scope = rememberCoroutineScope()
-    var state by remember(item?.uri) { mutableStateOf<SearchState>(if (search.hasApiKey) SearchState.Searching else SearchState.NoKey) }
-    var attempt by remember { mutableIntStateOf(0) }
-    LaunchedEffect(item?.uri, attempt) {
-        if (item == null || !search.hasApiKey) return@LaunchedEffect
-        state = SearchState.Searching
-        state = runCatching { search.search(item) }.fold(
-            { if (it.isEmpty()) SearchState.Failed("Nothing found for \"${SubtitleQuery.from(item.title).text}\".") else SearchState.Results(it) },
-            { SearchState.Failed(it.message ?: it.javaClass.simpleName) },
-        )
-    }
-    SidePanel("OpenSubtitles", focusIndex = 0, focusKey = state::class) {
-        when (val current = state) {
-            SearchState.NoKey -> {
-                item { InfoRow("Add your OpenSubtitles API key in Settings → OpenSubtitles first.", null, focusFor(0)) }
-            }
-            SearchState.Searching -> item { InfoRow("Searching…", null, focusFor(0)) }
-            is SearchState.Downloading -> item { InfoRow("Downloading ${current.result.release}…", null, focusFor(0)) }
-            is SearchState.Failed -> {
-                item { InfoRow("Couldn't search", current.message) }
-                item { ActionRow("Try again") { attempt++ } }
-                item { ActionRow("Back", modifier = focusFor(0)) { onDone() } }
-            }
-            is SearchState.Results -> current.results.take(40).forEachIndexed { i, result ->
-                item {
-                    ChoiceRow(
-                        label = result.release,
-                        detail = listOfNotNull(
-                            MediaInfo.languageName(result.language) ?: result.language,
-                            if (result.hashMatch) "Matches this file" else null,
-                            if (result.hearingImpaired) "SDH" else null,
-                            "${result.downloads} downloads",
-                        ).joinToString(" · "),
-                        selected = false,
-                        onClick = {
-                            state = SearchState.Downloading(result)
-                            scope.launch {
-                                runCatching { search.download(result) }
-                                    .onSuccess { file ->
-                                        val label = "${MediaInfo.languageName(result.language) ?: result.language} · OpenSubtitles"
-                                        session.addSubtitle(android.net.Uri.fromFile(file).toString(), label, result.language)
-                                        session.notice = "Subtitle added: ${result.release}"
-                                        onDone()
-                                    }
-                                    .onFailure { state = SearchState.Failed("Download failed: ${it.message}") }
-                            }
-                        },
-                        modifier = focusFor(i),
-                    )
-                }
-            }
-        }
     }
 }
 

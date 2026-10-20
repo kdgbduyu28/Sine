@@ -40,6 +40,8 @@ data class PlayItem(
     val playUri: String = uri,
 )
 
+data class ExternalSubtitle(val uri: String, val label: String, val language: String?)
+
 data class TrackOption(
     val label: String,
     val selected: Boolean,
@@ -48,7 +50,7 @@ data class TrackOption(
     val index: Int,
 )
 
-enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, VIDEO, INFO }
+enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, SUBTITLE_SYNC, SUBTITLE_SECOND, SUBTITLE_TRANSLATE, VIDEO, INFO }
 
 data class ResumePrompt(val positionMs: Long, val durationMs: Long)
 
@@ -68,6 +70,9 @@ class PlayerSession(
         fun onFrameRate(fps: Float)
         fun onFinished(ended: Boolean)
         fun onProgress(item: PlayItem, positionMs: Long, durationMs: Long, state: ProgressState) = Unit
+
+        /** No subtitles in the preferred language: the host may fetch some online. */
+        fun onMissingSubtitles(item: PlayItem) = Unit
     }
 
     var engine by mutableStateOf<Engine?>(null)
@@ -118,6 +123,12 @@ class PlayerSession(
     var speed by mutableFloatStateOf(1f)
         private set
     var subtitleDelayMs by mutableLongStateOf(0)
+        private set
+
+    /** A second subtitle drawn at the top of the screen (language learning, two-language households). */
+    var secondaryCues by mutableStateOf<List<com.sine.player.subtitles.Cue>>(emptyList())
+        private set
+    var secondaryLabel by mutableStateOf<String?>(null)
         private set
 
     /** Pending seek position while the user is scrubbing with the remote. */
@@ -275,6 +286,28 @@ class PlayerSession(
         player?.setPlaybackSpeed(value)
     }
 
+    fun setSubtitleDelay(ms: Long) {
+        subtitleDelayMs = ms.coerceIn(-600_000, 600_000)
+        engine?.setSubtitleDelay(subtitleDelayMs)
+    }
+
+    fun setSecondary(cues: List<com.sine.player.subtitles.Cue>, label: String?) {
+        secondaryCues = cues
+        secondaryLabel = label
+    }
+
+    /** Subtitle files attached to the current item (sidecars, server subtitles, downloads). */
+    fun externalSubtitles(): List<ExternalSubtitle> = current?.subtitles.orEmpty().map {
+        ExternalSubtitle(it.uri.toString(), it.label ?: android.net.Uri.decode(it.uri.lastPathSegment.orEmpty()), it.language)
+    }
+
+    /** The external subtitle that's selected right now, when the selected track is one. */
+    fun selectedExternalSubtitle(): ExternalSubtitle? {
+        val group = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_TEXT && it.isSelected } ?: return null
+        val id = (0 until group.length).firstOrNull { group.isTrackSelected(it) }?.let { group.getTrackFormat(it).id } ?: return null
+        return externalSubtitles().firstOrNull { id.endsWith(it.uri) }
+    }
+
     fun adjustSubtitleDelay(deltaMs: Long) {
         subtitleDelayMs = if (deltaMs == 0L) 0 else (subtitleDelayMs + deltaMs).coerceIn(-60_000, 60_000)
         engine?.setSubtitleDelay(subtitleDelayMs)
@@ -286,8 +319,9 @@ class PlayerSession(
      */
     fun addSubtitle(uri: String, label: String, language: String?) {
         val item = current ?: return
+        if (item.subtitles.any { it.uri.toString() == uri }) return
         val config = MediaItem.SubtitleConfiguration.Builder(Uri.parse(uri))
-            .setId("added:${item.subtitles.size}:$uri")
+            .setId(uri)
             .setMimeType(subtitleMime(uri))
             .setLanguage(language)
             .setLabel(label)
@@ -447,6 +481,7 @@ class PlayerSession(
             tracks = newTracks
             if (maybeSwitchForUnsupportedTracks(newTracks)) return
             selectPendingSubtitle(newTracks)
+            checkPreferredSubtitles(newTracks)
             val video = newTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
             val videoIndex = video?.let { g -> (0 until g.length).firstOrNull { g.isTrackSelected(it) } }
             val format = if (video != null && videoIndex != null) video.getTrackFormat(videoIndex) else null
@@ -484,6 +519,21 @@ class PlayerSession(
             }
             error = describe(e)
         }
+    }
+
+    private var subtitlesCheckedFor: String? = null
+
+    /** Once per item: ask the host to look online when there's no subtitle in the preferred language. */
+    private fun checkPreferredSubtitles(newTracks: Tracks) {
+        val item = current ?: return
+        val preferred = settings.subtitleLanguage
+        if (preferred.isEmpty() || settings.autoSubtitles == com.sine.player.data.AutoSubtitles.OFF) return
+        if (newTracks.groups.isEmpty() || subtitlesCheckedFor == item.uri) return
+        subtitlesCheckedFor = item.uri
+        val has = newTracks.groups.any { g ->
+            g.type == C.TRACK_TYPE_TEXT && (0 until g.length).any { com.sine.player.subtitles.Languages.same(g.getTrackFormat(it).language, preferred) }
+        } || item.subtitles.any { com.sine.player.subtitles.Languages.same(it.language, preferred) }
+        if (!has) host.onMissingSubtitles(item)
     }
 
     private fun shouldTryMpv(errorCode: Int): Boolean =
@@ -603,6 +653,7 @@ class PlayerSession(
 
         fun sidecarConfig(uri: String, sidecar: MediaFiles.Sidecar) =
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(uri))
+                .setId(uri)
                 .setMimeType(subtitleMime(sidecar.fileName))
                 .setLanguage(sidecar.language)
                 .setLabel(sidecar.label)
@@ -612,6 +663,7 @@ class PlayerSession(
         /** A subtitle served next to a media server or DLNA item. */
         fun remoteConfig(sub: com.sine.player.source.RemoteSubtitle) =
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub.url))
+                .setId(sub.url)
                 .setMimeType(subtitleMime(sub.fileName ?: Uri.parse(sub.url).lastPathSegment.orEmpty()))
                 .setLanguage(sub.language)
                 .setLabel(sub.label)

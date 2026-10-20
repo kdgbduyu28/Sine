@@ -23,17 +23,19 @@ import androidx.tv.material3.Text
 import com.sine.player.SineApp
 import com.sine.player.ui.theme.SineColors
 
-/** The user's own OpenSubtitles.com API key (and optional account for a bigger download quota). */
+/** Subtitle sites: the user's own OpenSubtitles and SubDL keys, and the keyless Podnapisi switch. */
 @Composable
 fun OpenSubtitlesScreen(onDone: () -> Unit) {
     val s = SineApp.instance.settings
+    var subdlKey by remember { mutableStateOf(s.subdlApiKey) }
+    var podnapisi by remember { mutableStateOf(s.podnapisiEnabled) }
     var apiKey by remember { mutableStateOf(s.openSubtitlesApiKey) }
     var user by remember { mutableStateOf(s.openSubtitlesUser) }
     var password by remember { mutableStateOf(s.openSubtitlesPassword) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
-    Page("OpenSubtitles", "Search and download subtitles from the player's Subtitles panel") {
+    Page("Subtitle sites", "Sine searches all of these at once and ranks the results against your file") {
         Column(Modifier.verticalScroll(rememberScrollState()).width(720.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(
                 "Create a free API consumer at opensubtitles.com → API, then paste its key here. " +
@@ -41,11 +43,27 @@ fun OpenSubtitlesScreen(onDone: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = SineColors.muted,
             )
-            TvTextField("API key", apiKey, { apiKey = it }, Modifier.focusRequester(focus))
+            SettingRow(
+                "Podnapisi",
+                "Free, no account needed. Good coverage for movies and TV.",
+                if (podnapisi) "On" else "Off",
+                { podnapisi = !podnapisi },
+                Modifier.focusRequester(focus),
+            )
+            Text("OpenSubtitles", style = MaterialTheme.typography.titleMedium, color = SineColors.text)
+            TvTextField("OpenSubtitles API key", apiKey, { apiKey = it })
             TvTextField("Username (optional)", user, { user = it })
             TvTextField("Password (optional)", password, { password = it }, password = true)
+            Text(
+                "SubDL: sign up free at subdl.com, then copy the API key from your account panel.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SineColors.muted,
+            )
+            TvTextField("SubDL API key", subdlKey, { subdlKey = it })
             Spacer(Modifier.height(4.dp))
             Button(onClick = {
+                s.podnapisiEnabled = podnapisi
+                s.subdlApiKey = subdlKey.trim()
                 s.openSubtitlesApiKey = apiKey.trim()
                 s.openSubtitlesUser = user.trim()
                 s.openSubtitlesPassword = password

@@ -20,6 +20,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import com.sine.player.SineApp
 import com.sine.player.downloads.Downloads
+import com.sine.player.subtitles.SmartSubtitles
+import com.sine.player.subtitles.SubtitleCache
 import com.sine.player.mediaserver.ProgressState
 import com.sine.player.player.mpv.MpvEngine
 import com.sine.player.player.mpv.MpvPlayer
@@ -83,7 +85,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         val needsLookup = Uri.parse(uri).scheme in lookupSchemes
 
         if (folder == null && (!needsLookup || Downloads.store.finished(uri) != null)) {
-            session.start(listOf(Downloads.localize(PlayItem(uri, title, null, externalSubs))), 0, startPosition)
+            session.start(listOf(SubtitleCache.attach(Downloads.localize(PlayItem(uri, title, null, externalSubs)))), 0, startPosition)
             return
         }
         lifecycleScope.launch {
@@ -100,7 +102,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
                 runCatching { Browsers.resolve(uri) }.getOrNull()?.let { full -> queue[start] = toPlayItem(full, folder) }
             }
             // Downloaded copies play from local storage, even when the source is offline.
-            session.start(queue.map(Downloads::localize), start, startPosition)
+            session.start(queue.map { SubtitleCache.attach(Downloads.localize(it)) }, start, startPosition)
         }
     }
 
@@ -160,6 +162,26 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
             "file" -> parsed.path ?: uri
             null -> uri
             else -> SineApp.instance.streamProxy.urlFor(uri)
+        }
+    }
+
+    override fun onMissingSubtitles(item: PlayItem) {
+        val subtitles = SmartSubtitles(this, SineApp.instance.settings)
+        if (subtitles.providers().isEmpty()) return
+        val language = MediaInfo.languageName(SineApp.instance.settings.subtitleLanguage) ?: "your language"
+        lifecycleScope.launch {
+            session.notice = "Looking for $language subtitles online…"
+            val found = runCatching { subtitles.autoFind(item) }.getOrNull()
+            if (session.current?.uri != item.uri) return@launch
+            if (found == null) {
+                session.notice = "No $language subtitles matched this file. Subtitles → Find online to choose one."
+                return@launch
+            }
+            val ranked = found.ranked
+            val label = "${MediaInfo.languageName(ranked.candidate.language) ?: ranked.candidate.language} · ${ranked.candidate.provider}"
+            SubtitleCache.remember(item.uri, found.file, label, ranked.candidate.language)
+            session.addSubtitle(Uri.fromFile(found.file).toString(), label, ranked.candidate.language)
+            session.notice = "Subtitles added from ${ranked.candidate.provider}: ${ranked.match}"
         }
     }
 

@@ -137,6 +137,7 @@ object Downloads {
             val path = sub.localPath ?: return@mapNotNull null
             if (!File(path).exists()) return@mapNotNull null
             MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(File(path)))
+                .setId(Uri.fromFile(File(path)).toString())
                 .setMimeType(PlayerSession.subtitleMime(sub.fileName))
                 .setLanguage(sub.language)
                 .setLabel(sub.label)

@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.core)
     implementation(libs.work.runtime)
+    implementation(libs.mlkit.translate)
 
     implementation(libs.smbj)
     implementation(libs.libmpv)

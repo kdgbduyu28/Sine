@@ -144,9 +144,27 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}) {
 
             item {
                 SettingRow(
-                    "OpenSubtitles",
-                    "Your API key for searching subtitles from the player",
-                    if (s.openSubtitlesApiKey.isBlank()) "Not set" else "Key saved",
+                    "Download subtitles automatically",
+                    s.autoSubtitles.description + if (s.subtitleLanguage.isEmpty()) ". Needs a preferred subtitle language above." else "",
+                    s.autoSubtitles.label,
+                    { s.autoSubtitles = next(com.sine.player.data.AutoSubtitles.entries, s.autoSubtitles) },
+                )
+            }
+            item {
+                SettingRow("Avoid hearing-impaired subtitles", "Rank SDH subtitles (with [door creaks]) lower", onOff(s.avoidHearingImpaired), {
+                    s.avoidHearingImpaired = !s.avoidHearingImpaired
+                })
+            }
+            item {
+                val sites = listOfNotNull(
+                    "OpenSubtitles".takeIf { s.openSubtitlesApiKey.isNotBlank() },
+                    "Podnapisi".takeIf { s.podnapisiEnabled },
+                    "SubDL".takeIf { s.subdlApiKey.isNotBlank() },
+                )
+                SettingRow(
+                    "Subtitle sites",
+                    "Where Sine searches. Podnapisi needs no account; OpenSubtitles and SubDL need your own free key.",
+                    if (sites.isEmpty()) "None" else sites.joinToString(", "),
                     onOpenSubtitles,
                 )
             }
