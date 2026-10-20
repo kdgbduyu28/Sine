@@ -52,6 +52,10 @@ fun BrowseScreen(
     onOpenPhotos: (folder: String, startUri: String?) -> Unit = { _, _ -> },
 ) {
     var menuFor by remember(uri) { mutableStateOf<MediaEntry?>(null) }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // Coming back to the top of a share later offers this folder again.
+    LaunchedEffect(uri) { LastFolders.remember(appContext, uri) }
+    val continueFolder = remember(uri) { LastFolders.continueFrom(appContext, uri) }
     var notice by remember { mutableStateOf<String?>(null) }
     var entries by remember(uri) { mutableStateOf<List<MediaEntry>?>(null) }
     var error by remember(uri) { mutableStateOf<String?>(null) }
@@ -120,6 +124,17 @@ fun BrowseScreen(
             list == null -> Text(if (uri.startsWith("dlna://servers/") && Uri.parse(uri).pathSegments.isEmpty()) "Looking for DLNA servers…" else "Loading…", color = SineColors.muted)
             list.isEmpty() -> Message("Nothing to play here", "This folder has no videos, music, photos or sub-folders.")
             else -> LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                continueFolder?.let { last ->
+                    item(key = "continue") {
+                        ListItem(
+                            selected = false,
+                            onClick = { onOpenFolder(last) },
+                            leadingContent = { Icon(Icons.Filled.Folder, null, tint = SineColors.accent, modifier = Modifier.size(28.dp)) },
+                            headlineContent = { Text("Continue where you were", maxLines = 1) },
+                            supportingContent = { Text(LastFolders.relative(uri, last), maxLines = 1) },
+                        )
+                    }
+                }
                 itemsIndexed(list, key = { _, entry -> entry.uri }) { index, entry ->
                     val record = remember(entry.uri, resumeVersion) { if (entry.isVideo) resume.get(entry.uri) else null }
                     val downloaded = remember(entry.uri, SineApp.instance.downloads.items) { SineApp.instance.downloads.finished(entry.uri) != null }

@@ -26,6 +26,8 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 **Away from home:** Settings → Playback → Server streaming quality asks Jellyfin, Emby or Plex to convert to 2–40 Mbps HLS. By default only servers that aren't on the home network (private IPs, `.local` names) are converted; embedded text subtitles may not come through a conversion, external ones do.
 
+**Continue where you were:** opening a share, drive or server again offers the folder you were last in as the first row.
+
 **Sorting:** in any folder, Menu on the remote switches between name, newest first and largest first (folders stay on top); the choice is remembered.
 
 **Thumbnails:** video files in folder lists show a frame from about 10% in (cached); by default only for USB and internal storage, or everywhere in Settings → Files.
