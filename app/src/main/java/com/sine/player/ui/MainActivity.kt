@@ -120,6 +120,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("backups") { com.sine.player.backup.BackupScreen() }
                         composable("about") { com.sine.player.diagnostics.AboutScreen() }
+                        composable("phone") { com.sine.player.remote.PhoneRemoteScreen() }
                         composable("livetv") {
                             com.sine.player.livetv.LiveTvScreen(
                                 onPlay = play,
@@ -175,6 +176,7 @@ class MainActivity : ComponentActivity() {
                                 onLibrary = { nav.navigate("library/settings") },
                                 onBackups = { nav.navigate("backups") },
                                 onAbout = { nav.navigate("about") },
+                                onPhoneRemote = { nav.navigate("phone") },
                             )
                         }
                         composable("remote") { RemoteButtonsScreen() }

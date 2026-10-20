@@ -135,6 +135,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.jsch)
     implementation(libs.nfs.client)
+    // QR code for the phone remote link.
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     // Android's org.json is a stub in local unit tests; the real one lets parsers be tested.

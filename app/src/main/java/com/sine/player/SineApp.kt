@@ -44,6 +44,8 @@ class SineApp : Application() {
         private set
     lateinit var recordings: com.sine.player.livetv.Recordings
         private set
+    lateinit var phoneRemote: com.sine.player.remote.PhoneRemote
+        private set
     lateinit var downloads: DownloadStore
         private set
     lateinit var profiles: Profiles
@@ -89,6 +91,8 @@ class SineApp : Application() {
         liveTv = com.sine.player.livetv.LiveTv(this)
         recordings = com.sine.player.livetv.Recordings(this)
         runCatching { recordings.rearm() }
+        phoneRemote = com.sine.player.remote.PhoneRemote(this)
+        runCatching { phoneRemote.install(this) }
         household = Household(this)
         runCatching { household.start() }
         if (settings.castReceiver) runCatching { com.sine.player.cast.CastReceiverService.start(this) }

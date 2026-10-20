@@ -37,6 +37,7 @@ import java.util.concurrent.Executors
  */
 interface CastTarget {
     val uri: String?
+    val title: String? get() = null
     val positionMs: Long
     val durationMs: Long
     val playing: Boolean

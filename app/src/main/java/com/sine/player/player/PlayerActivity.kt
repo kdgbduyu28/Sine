@@ -69,6 +69,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     /** Lets a phone casting to Sine (DLNA) control and follow this player. */
     private val castTarget = object : com.sine.player.cast.CastTarget {
         override val uri get() = session.current?.uri
+        override val title get() = session.current?.title
         override val positionMs get() = session.positionMs
         override val durationMs get() = session.durationMs
         override val playing get() = session.isPlaying

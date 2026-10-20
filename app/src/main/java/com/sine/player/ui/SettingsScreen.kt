@@ -33,6 +33,7 @@ fun SettingsScreen(
     onLibrary: () -> Unit = {},
     onBackups: () -> Unit = {},
     onAbout: () -> Unit = {},
+    onPhoneRemote: () -> Unit = {},
 ) {
     val s = SineApp.instance.settings
     val context = LocalContext.current
@@ -298,6 +299,14 @@ fun SettingsScreen(
             }
 
             item { SectionTitle("Casting") }
+            item {
+                SettingRow(
+                    "Phone remote",
+                    "Type and control Sine from your phone's browser (scan a QR code)",
+                    if (SineApp.instance.phoneRemote.enabled) "On" else "Off",
+                    onPhoneRemote,
+                )
+            }
             item {
                 SettingRow(
                     "Receive from phones",

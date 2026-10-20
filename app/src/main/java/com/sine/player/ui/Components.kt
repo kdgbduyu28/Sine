@@ -169,8 +169,26 @@ fun TvTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
 ) {
     var focused by remember { mutableStateOf(false) }
+    // Text typed on the phone remote lands in whichever field is focused.
+    val phone = com.sine.player.SineApp.instance.phoneRemote
+    val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
+    val currentOnChange by androidx.compose.runtime.rememberUpdatedState(onValueChange)
+    androidx.compose.runtime.LaunchedEffect(focused) {
+        if (!focused) return@LaunchedEffect
+        phone.edits.collect { edit -> currentOnChange(com.sine.player.remote.TextEdit.apply(currentValue, edit)) }
+    }
+    androidx.compose.runtime.LaunchedEffect(focused, value) {
+        if (focused) phone.focusedField = com.sine.player.remote.FocusedField(label, value, password)
+    }
+    androidx.compose.runtime.DisposableEffect(focused) {
+        onDispose { if (phone.focusedField?.label == label) phone.focusedField = null }
+    }
     Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = SineColors.muted)
+        Text(
+            if (focused && phone.enabled) "$label  ·  or type it on your phone" else label,
+            style = MaterialTheme.typography.labelLarge,
+            color = SineColors.muted,
+        )
         Spacer(Modifier.height(6.dp))
         Box(
             Modifier
