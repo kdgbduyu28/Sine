@@ -26,6 +26,13 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
 
     private val isBearer get() = key.length > 60
 
+    /** The trailer's YouTube key; falls back to English videos when there are none in [language]. */
+    fun trailer(tmdbId: Int, tv: Boolean): String? {
+        val path = "/${if (tv) "tv" else "movie"}/$tmdbId/videos"
+        Trailers.pick(get(path))?.let { return it }
+        return if (language.startsWith("en")) null else Trailers.pick(Tmdb(key, "en-US").get(path))
+    }
+
     fun movie(title: String, year: Int?): Meta? {
         val results = get("/search/movie", buildMap {
             put("query", title)

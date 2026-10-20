@@ -57,6 +57,30 @@ object LibraryFilter {
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .map { it.key }
 
+    /**
+     * Titles most like [target]: the share of genres in common (at least one), then the closest
+     * year, then rating.
+     */
+    fun <T> similar(target: GridEntry<T>, candidates: List<GridEntry<T>>, limit: Int = 12): List<GridEntry<T>> {
+        val genres = target.genres.map { it.lowercase(Locale.ROOT) }.toSet()
+        if (genres.isEmpty()) return emptyList()
+        return candidates.asSequence()
+            .filter { it.item != target.item }
+            .mapNotNull { c ->
+                val theirs = c.genres.map { it.lowercase(Locale.ROOT) }.toSet()
+                val shared = (genres intersect theirs).size
+                if (shared == 0) null else c to shared.toDouble() / (genres union theirs).size
+            }
+            .sortedWith(
+                compareByDescending<Pair<GridEntry<T>, Double>> { it.second }
+                    .thenBy { p -> if (target.year != null && p.first.year != null) kotlin.math.abs(target.year - p.first.year!!) else 100 }
+                    .thenByDescending { it.first.rating ?: 0.0 },
+            )
+            .take(limit)
+            .map { it.first }
+            .toList()
+    }
+
     /** First letter for the A–Z jump; digits and symbols share "#". */
     fun initial(title: String): Char = sortTitle(title).firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
 }

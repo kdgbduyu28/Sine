@@ -119,6 +119,23 @@ object Library {
         )
     }
 
+    /** Movies (or shows) in the library most like [key], for "More like this". */
+    fun similar(kind: LibraryKind, key: String, limit: Int = 12): List<GridEntry<Any>> {
+        val profile = SineApp.instance.profiles.active
+        val entries: List<GridEntry<Any>> = when (kind) {
+            LibraryKind.MOVIES -> store.movies.filter { profile.allows(it.file.uri) }.distinctBy { it.key }.mapNotNull { m ->
+                val meta = store.meta[m.key] ?: return@mapNotNull null
+                GridEntry<Any>(m, meta.title ?: m.title, meta.year ?: m.year, meta.rating, meta.genres, m.addedAt, false)
+            }
+            LibraryKind.SHOWS -> store.shows.filter { profile.allows(it.folder) }.mapNotNull { s ->
+                val meta = store.meta[s.key] ?: return@mapNotNull null
+                GridEntry<Any>(s, meta.title ?: s.title, meta.year ?: s.year, meta.rating, meta.genres, s.addedAt, false)
+            }
+        }
+        val target = entries.firstOrNull { (it.item as? Movie)?.key == key || (it.item as? Show)?.key == key } ?: return emptyList()
+        return LibraryFilter.similar(target, entries, limit)
+    }
+
     /** Looks up TMDB details for anything that doesn't have them yet (needs the user's key). */
     suspend fun fetchMetadata(force: Boolean = false) = withContext(Dispatchers.IO) {
         val key = SineApp.instance.settings.tmdbApiKey.trim()

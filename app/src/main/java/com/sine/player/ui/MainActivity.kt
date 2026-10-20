@@ -186,12 +186,18 @@ class MainActivity : ComponentActivity() {
                             com.sine.player.library.LibraryGridScreen(kind, onMovie = { nav.navigate("movie/${Uri.encode(it)}") }, onShow = { nav.navigate("show/${Uri.encode(it)}") })
                         }
                         composable("movie/{key}") { entry ->
-                            com.sine.player.library.MovieDetailScreen(Uri.decode(entry.arguments?.getString("key").orEmpty())) { uri, title, folder, position ->
+                            com.sine.player.library.MovieDetailScreen(
+                                Uri.decode(entry.arguments?.getString("key").orEmpty()),
+                                onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
+                            ) { uri, title, folder, position ->
                                 playFrom(uri, title, folder, position ?: 0, null)
                             }
                         }
                         composable("show/{key}") { entry ->
-                            com.sine.player.library.ShowDetailScreen(Uri.decode(entry.arguments?.getString("key").orEmpty())) { uri, title, folder, position ->
+                            com.sine.player.library.ShowDetailScreen(
+                                Uri.decode(entry.arguments?.getString("key").orEmpty()),
+                                onShow = { nav.navigate("show/${Uri.encode(it)}") },
+                            ) { uri, title, folder, position ->
                                 playFrom(uri, title, folder, position ?: 0, null)
                             }
                         }

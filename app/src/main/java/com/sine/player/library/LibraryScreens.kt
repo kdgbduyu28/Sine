@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
+import kotlinx.coroutines.launch
 import androidx.tv.material3.Button
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
@@ -195,6 +196,48 @@ fun LibraryGridScreen(kind: LibraryKind, onMovie: (String) -> Unit, onShow: (Str
     }
 }
 
+/** Opens the TMDB trailer in YouTube; hidden without a TMDB match or key. */
+@Composable
+private fun TrailerButton(tmdbId: Int?, tv: Boolean) {
+    val key = SineApp.instance.settings.tmdbApiKey.trim()
+    if (tmdbId == null || key.isEmpty()) return
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var label by remember { mutableStateOf("Trailer") }
+    OutlinedButton(onClick = {
+        scope.launch {
+            label = "Finding trailer…"
+            val youtube = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { Tmdb(key).trailer(tmdbId, tv) }.getOrNull() }
+            label = when {
+                youtube == null -> "No trailer"
+                runCatching { Trailers.open(context, youtube) }.isFailure -> "Install YouTube"
+                else -> "Trailer"
+            }
+        }
+    }) { Text(label) }
+}
+
+/** Library titles that share genres with this one. */
+@Composable
+private fun MoreLikeThis(kind: LibraryKind, key: String, onOpen: (String) -> Unit, posterWidth: Int = 130) {
+    val similar = remember(key) { Library.similar(kind, key) }
+    if (similar.isEmpty()) return
+    Spacer(Modifier.height(24.dp))
+    Text("More like this", style = MaterialTheme.typography.titleMedium, color = SineColors.text)
+    Spacer(Modifier.height(8.dp))
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        items(similar, key = { (it.item as? Movie)?.key ?: (it.item as Show).key }) { e ->
+            val itemKey = (e.item as? Movie)?.key ?: (e.item as Show).key
+            val poster = when (val item = e.item) {
+                is Movie -> Library.posterFor(item.key, item.localPoster)
+                is Show -> Library.posterFor(item.key, item.localPoster)
+                else -> null
+            }
+            PosterCard(e.title, e.year?.toString(), poster, onClick = { onOpen(itemKey) }, width = posterWidth)
+        }
+    }
+}
+
 /** Backdrop with a dark gradient, shared by movie and show pages. */
 @UnstableApi
 @Composable
@@ -213,7 +256,11 @@ private fun Backdrop(url: String?) {
 
 @UnstableApi
 @Composable
-fun MovieDetailScreen(key: String, onPlay: (uri: String, title: String?, folder: String?, positionMs: Long?) -> Unit) {
+fun MovieDetailScreen(
+    key: String,
+    onMovie: (String) -> Unit = {},
+    onPlay: (uri: String, title: String?, folder: String?, positionMs: Long?) -> Unit,
+) {
     val store = Library.store
     val movie = store.movie(key) ?: run {
         Message("Not in the library", "Rescan the library from Settings → Library.")
@@ -255,16 +302,22 @@ fun MovieDetailScreen(key: String, onPlay: (uri: String, title: String?, folder:
                 OutlinedButton(onClick = {
                     if (record?.watched == true) resume.forget(movie.file.uri) else resume.markWatched(movie.file.uri, movie.title, movie.file.folder)
                 }) { Text(if (record?.watched == true) "Mark unwatched" else "Mark watched") }
+                TrailerButton(meta?.tmdbId, tv = false)
             }
             Spacer(Modifier.height(16.dp))
             Text(android.net.Uri.decode(movie.file.uri), style = MaterialTheme.typography.bodySmall, color = SineColors.muted, maxLines = 1)
+            MoreLikeThis(LibraryKind.MOVIES, key, onOpen = onMovie)
         }
     }
 }
 
 @UnstableApi
 @Composable
-fun ShowDetailScreen(key: String, onPlay: (uri: String, title: String?, folder: String?, positionMs: Long?) -> Unit) {
+fun ShowDetailScreen(
+    key: String,
+    onShow: (String) -> Unit = {},
+    onPlay: (uri: String, title: String?, folder: String?, positionMs: Long?) -> Unit,
+) {
     val store = Library.store
     val show = store.show(key) ?: run {
         Message("Not in the library", "Rescan the library from Settings → Library.")
@@ -294,8 +347,11 @@ fun ShowDetailScreen(key: String, onPlay: (uri: String, title: String?, folder: 
                 meta?.overview?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = SineColors.text, maxLines = 7) }
                 Spacer(Modifier.height(24.dp))
                 val nextRecord = resume.get(next.file.uri)
-                Button(onClick = { onPlay(next.file.uri, "${show.title} ${Library.episodeTitle(show, next)}", next.file.folder, nextRecord?.takeIf { it.resumable }?.positionMs) }, modifier = Modifier.focusRequester(focus)) {
-                    Text((if (nextRecord?.resumable == true) "Resume " else "Play ") + "S%02dE%02d".format(next.season, next.number))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Button(onClick = { onPlay(next.file.uri, "${show.title} ${Library.episodeTitle(show, next)}", next.file.folder, nextRecord?.takeIf { it.resumable }?.positionMs) }, modifier = Modifier.focusRequester(focus)) {
+                        Text((if (nextRecord?.resumable == true) "Resume " else "Play ") + "S%02dE%02d".format(next.season, next.number))
+                    }
+                    TrailerButton(meta?.tmdbId, tv = true)
                 }
                 Spacer(Modifier.height(16.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -303,6 +359,7 @@ fun ShowDetailScreen(key: String, onPlay: (uri: String, title: String?, folder: 
                         androidx.tv.material3.FilterChip(selected = s == season, onClick = { season = s }) { Text(if (s == 0) "Specials" else "Season $s") }
                     }
                 }
+                MoreLikeThis(LibraryKind.SHOWS, key, onOpen = onShow, posterWidth = 110)
             }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items(show.episodes.filter { it.season == season }, key = { it.file.uri }) { episode ->
