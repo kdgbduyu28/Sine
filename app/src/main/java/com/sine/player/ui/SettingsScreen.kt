@@ -209,6 +209,11 @@ fun SettingsScreen(
 
             item { SectionTitle("Subtitles") }
             item {
+                SettingRow("Turn subtitles on", s.subtitleMode.description, s.subtitleMode.label, {
+                    s.subtitleMode = next(com.sine.player.player.SubtitleMode.entries.toList(), s.subtitleMode)
+                })
+            }
+            item {
                 SettingRow("Size", null, "${(s.subtitleScale * 100).toInt()}%", {
                     s.subtitleScale = next(AppSettings.subtitleScales, s.subtitleScale)
                 })

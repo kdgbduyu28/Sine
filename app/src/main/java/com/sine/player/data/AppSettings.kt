@@ -62,6 +62,7 @@ class AppSettings(context: Context) {
     var defaultAspect by enumPref("aspect", AspectMode.FIT)
     var audioLanguage by pref("audio_language", "")
     var subtitleLanguage by pref("subtitle_language", "")
+    var subtitleMode by enumPref("subtitle_mode", com.sine.player.player.SubtitleMode.FOREIGN)
     var subtitleScale by pref("subtitle_scale", 1.0f)
     var subtitleBottom by pref("subtitle_bottom", 0.08f)
     var subtitleBackground by pref("subtitle_background", false)

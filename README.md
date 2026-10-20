@@ -119,6 +119,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 ## Phase 12: power tools
 
 - **Up next, still watching, sleep timer:** a countdown card before the next episode (from the start of the credits when Sine knows them, else the last 20 seconds; OK plays now, Back stops after this one); after 3 episodes in a row with no button pressed Sine pauses and asks "Still watching?"; the moon button sets a sleep timer (15–90 minutes or end of this video) that pauses and lets the TV sleep.
+- **Smart subtitles:** Settings → Subtitles → Turn subtitles on: "Only for other languages" (default) shows full subtitles when the audio isn't in your language and just forced ones when it is; also Always, Forced only, Off. Choices you made for a file or season still win.
 - **Subtitles:** the size and height settings now also move and resize picture subtitles (PGS from Blu-ray remuxes, VobSub, DVB) in Media3; "Clean up SDH subtitles" hides [sound effects], (laughs) and SPEAKER: labels in both engines.
 - **HDR on a TV without HDR:** when an HDR10 or HLG video meets a display that can't show it, Sine moves it to mpv, which tone-maps to SDR (BT.2446a with measured peaks) instead of showing washed-out colours. Switching back to Media3 by hand is respected.
 - **Sync per output:** in the Audio panel, "Sync for WH-1000XM5" (or HDMI eARC, TV speakers…) sets an offset for that output; it's applied automatically whenever that device is in use, on top of any per-file sync.

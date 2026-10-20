@@ -663,10 +663,41 @@ class PlayerSession(
             }
         }
 
-    /** Switches to [AudioRank]'s choice without remembering it as the viewer's own. */
-    private fun pickBestAudio() {
+    private fun currentAudioLanguage(): String? =
+        trackOptions(C.TRACK_TYPE_AUDIO).firstOrNull { it.selected }?.let { it.group?.getFormat(it.index)?.language }
+
+    /** The language the viewer reads: subtitle language, else audio language, else the TV's. */
+    private fun myLanguage(): String =
+        settings.subtitleLanguage.ifEmpty { settings.audioLanguage }.ifEmpty { java.util.Locale.getDefault().language }
+
+    /** Turns subtitles on or off by Settings → Subtitles → mode, without remembering it as the viewer's choice. */
+    private fun pickSubtitles(audioLanguage: String?) {
+        val options = trackOptions(C.TRACK_TYPE_TEXT)
+        if (options.isEmpty()) return
+        val candidates = options.map { o ->
+            val f = o.group!!.getFormat(o.index)
+            SubtitleCandidate(
+                language = f.language,
+                forced = f.selectionFlags and C.SELECTION_FLAG_FORCED != 0 || f.label?.contains("forced", ignoreCase = true) == true,
+                hearingImpaired = f.roleFlags and C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND != 0 || f.label?.contains("sdh", ignoreCase = true) == true,
+                supported = o.supported,
+            )
+        }
+        val pick = SubtitlePick.decide(settings.subtitleMode, candidates, audioLanguage, myLanguage(), settings.avoidHearingImpaired)
+        val current = options.indexOfFirst { it.selected }.takeIf { it >= 0 }
+        if (pick == current) return
+        restoring = true
+        try {
+            selectTrack(C.TRACK_TYPE_TEXT, pick?.let { options[it] })
+        } finally {
+            restoring = false
+        }
+    }
+
+    /** Switches to [AudioRank]'s choice without remembering it as the viewer's own; returns the audio language now playing. */
+    private fun pickBestAudio(): String? {
         val options = trackOptions(C.TRACK_TYPE_AUDIO)
-        if (options.size < 2) return
+        if (options.size < 2) return currentAudioLanguage()
         val formats = options.map { it.group!!.getFormat(it.index) }
         val candidates = options.zip(formats) { o, f ->
             AudioCandidate(
@@ -678,14 +709,15 @@ class PlayerSession(
         }
         val defaultIndex = formats.indexOfFirst { it.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0 }.takeIf { it >= 0 }
             ?: options.indexOfFirst { it.selected }
-        val best = AudioRank.best(candidates, settings.audioLanguage.ifEmpty { null }, defaultIndex) ?: return
-        if (options[best].selected) return
+        val best = AudioRank.best(candidates, settings.audioLanguage.ifEmpty { null }, defaultIndex) ?: return currentAudioLanguage()
+        if (options[best].selected) return formats[best].language
         restoring = true
         try {
             selectTrack(C.TRACK_TYPE_AUDIO, options[best])
         } finally {
             restoring = false
         }
+        return formats[best].language
     }
 
     fun selectTrack(type: Int, option: TrackOption?) {
@@ -733,7 +765,9 @@ class PlayerSession(
         val folderChoices = if (settings.rememberPerFile && settings.rememberPerFolder) item.folderUri?.let { memory?.folder(it) } else null
         val saved = if (settings.rememberPerFile) com.sine.player.data.FileMemory.merge(memory?.get(item.uri), folderChoices) else null
         // Nothing remembered for audio: pick the best track ourselves.
-        if (saved?.audio == null && settings.bestAudio) pickBestAudio()
+        val audioLanguage = if (saved?.audio == null && settings.bestAudio) pickBestAudio() else currentAudioLanguage()
+        // Nothing remembered for subtitles either: on or off by the subtitle mode.
+        if (!skipSubtitle && saved?.subtitle == null && saved?.subtitlesOff != true) pickSubtitles(audioLanguage)
         saved ?: return
         restoring = true
         try {
