@@ -68,6 +68,13 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.Sine.Player"
             tools:ignore="DiscouragedApi">
+            <!-- Entries Sine puts on the TV launcher's Continue watching row. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sine" android:host="play" />
+            </intent-filter>
             <!-- Lets file managers and Jellyfin/Plex/Emby clients use Sine as their external player. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

@@ -1,0 +1,168 @@
+package com.sine.player.library
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.media3.common.util.UnstableApi
+import com.sine.player.SineApp
+import com.sine.player.data.PlaybackRecord
+import com.sine.player.source.Browsers
+import com.sine.player.source.MediaEntry
+import com.sine.player.source.MediaFiles
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** A show's next episode to watch, for the Next up row. */
+data class NextUp(val show: Show, val episode: Episode, val record: PlaybackRecord?, val updatedAt: Long)
+
+/** Scans library folders, fetches posters and details, and works out what to watch next. */
+@UnstableApi
+object Library {
+    val store: LibraryStore get() = SineApp.instance.library
+
+    var scanning by mutableStateOf<String?>(null)
+        private set
+
+    private const val MAX_DEPTH = 5
+    private val posterNames = listOf("poster", "folder", "cover", "movie", "show")
+
+    suspend fun scan() {
+        if (scanning != null) return
+        scanning = "Scanning…"
+        try {
+            val movies = mutableListOf<Movie>()
+            val shows = mutableListOf<Show>()
+            store.roots.forEach { root ->
+                scanning = "Scanning ${Browsers.displayName(root.uri)}…"
+                runCatching {
+                    when (root.kind) {
+                        LibraryKind.MOVIES -> movies += scanMovies(root.uri)
+                        LibraryKind.SHOWS -> shows += scanShows(root.uri)
+                    }
+                }
+            }
+            store.replaceContents(movies.distinctBy { it.file.uri }, mergeShows(shows))
+            fetchMetadata()
+        } finally {
+            scanning = null
+        }
+    }
+
+    private suspend fun list(uri: String): List<MediaEntry> = runCatching { Browsers.list(uri, showHidden = false) }.getOrDefault(emptyList())
+
+    private fun poster(folder: String, entries: List<MediaEntry>): String? =
+        entries.filter { it.isImage }.firstOrNull { MediaFiles.baseName(it.name).lowercase() in posterNames }?.let { Browsers.child(folder, it.name) }
+
+    private suspend fun scanMovies(root: String): List<Movie> {
+        val found = mutableListOf<Movie>()
+        suspend fun walk(folder: String, folderName: String?, depth: Int) {
+            val entries = list(folder)
+            val poster = poster(folder, entries)
+            entries.filter { it.isVideo && !NameParser.isSample(it.name, it.size) }.forEach { video ->
+                val parsed = NameParser.movie(video.name, folderName)
+                found += Movie(
+                    key = NameParser.key(parsed.title, parsed.year),
+                    title = parsed.title,
+                    year = parsed.year,
+                    file = VideoFile(video.uri, folder, video.name, video.size, video.modified),
+                    localPoster = poster,
+                    addedAt = video.modified.takeIf { it > 0 } ?: System.currentTimeMillis(),
+                )
+            }
+            if (depth < MAX_DEPTH) entries.filter { it.isDirectory && !NameParser.isSkippedFolder(it.name) }.forEach { walk(it.uri, it.name, depth + 1) }
+        }
+        walk(root, null, 0)
+        return found
+    }
+
+    /**
+     * Each folder directly under a TV root is a show. When the root itself is a show (its children
+     * are season folders or episodes), it's treated as one.
+     */
+    private suspend fun scanShows(root: String): List<Show> {
+        val top = list(root)
+        val rootIsShow = top.any { it.isVideo } || top.filter { it.isDirectory }.any { NameParser.seasonOf(it.name) != null }
+        val showFolders = if (rootIsShow) listOf(root to Browsers.displayName(root)) else top.filter { it.isDirectory && !NameParser.isSkippedFolder(it.name) }.map { it.uri to it.name }
+        return showFolders.mapNotNull { (folder, name) ->
+            val episodes = mutableListOf<Episode>()
+            var poster: String? = null
+            suspend fun walk(uri: String, path: List<String>, depth: Int) {
+                val entries = list(uri)
+                if (depth == 0) poster = poster(uri, entries)
+                entries.filter { it.isVideo && !NameParser.isSample(it.name, it.size) }.forEach { video ->
+                    NameParser.episode(name, path, video.name)?.let { e ->
+                        episodes += Episode(e.season, e.episode, VideoFile(video.uri, uri, video.name, video.size, video.modified))
+                    }
+                }
+                if (depth < MAX_DEPTH) entries.filter { it.isDirectory && !NameParser.isSkippedFolder(it.name) }.forEach { walk(it.uri, path + it.name, depth + 1) }
+            }
+            walk(folder, emptyList(), 0)
+            if (episodes.isEmpty()) return@mapNotNull null
+            val parsed = com.sine.player.subtitles.SubtitleQuery.from(name)
+            Show(
+                key = NameParser.key(parsed.text, parsed.year),
+                title = parsed.text,
+                year = parsed.year,
+                folder = folder,
+                localPoster = poster,
+                episodes = episodes.distinctBy { "${it.season}:${it.number}" }.sortedWith(compareBy({ it.season }, { it.number })),
+                addedAt = episodes.maxOf { it.file.modified.takeIf { m -> m > 0 } ?: 0L }.takeIf { it > 0 } ?: System.currentTimeMillis(),
+            )
+        }
+    }
+
+    /** The same show in two roots (e.g. two drives) becomes one. */
+    private fun mergeShows(shows: List<Show>): List<Show> = shows.groupBy { it.key }.map { (_, group) ->
+        group.first().copy(
+            episodes = group.flatMap { it.episodes }.distinctBy { "${it.season}:${it.number}" }.sortedWith(compareBy({ it.season }, { it.number })),
+            addedAt = group.maxOf { it.addedAt },
+        )
+    }
+
+    /** Looks up TMDB details for anything that doesn't have them yet (needs the user's key). */
+    suspend fun fetchMetadata(force: Boolean = false) = withContext(Dispatchers.IO) {
+        val key = SineApp.instance.settings.tmdbApiKey.trim()
+        if (key.isEmpty()) return@withContext
+        val tmdb = Tmdb(key)
+        val month = 30L * 24 * 3_600_000
+        store.movies.distinctBy { it.key }.forEach { movie ->
+            val existing = store.meta[movie.key]
+            if (!force && existing != null && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            scanning = "Getting details: ${movie.title}"
+            runCatching { tmdb.movie(movie.title, movie.year) }.getOrNull()
+                ?.let { store.putMeta(movie.key, it) }
+                ?: store.putMeta(movie.key, Meta(null, null, null, null, null, null, emptyList(), null))
+        }
+        store.shows.forEach { show ->
+            val existing = store.meta[show.key]
+            val knownSeasons = existing?.episodes?.keys?.map { it.substringBefore(':').toInt() }?.toSet().orEmpty()
+            val missingSeason = show.seasons.any { it !in knownSeasons }
+            if (!force && existing != null && !missingSeason && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            scanning = "Getting details: ${show.title}"
+            runCatching { tmdb.show(show.title, show.year, show.seasons) }.getOrNull()
+                ?.let { store.putMeta(show.key, it) }
+                ?: store.putMeta(show.key, Meta(null, null, null, null, null, null, emptyList(), null))
+        }
+        scanning = null
+    }
+
+    fun posterFor(key: String, local: String?): String? = store.meta[key]?.poster ?: local
+
+    /** For each show you've started, the episode to play next, most recently watched first. */
+    fun nextUp(limit: Int = 20): List<NextUp> {
+        val resume = SineApp.instance.resume
+        return store.shows.mapNotNull { show ->
+            val records = show.episodes.mapNotNull { e -> resume.get(e.file.uri)?.let { e to it } }
+            val (lastEpisode, lastRecord) = records.maxByOrNull { it.second.updatedAt } ?: return@mapNotNull null
+            if (lastRecord.resumable) return@mapNotNull NextUp(show, lastEpisode, lastRecord, lastRecord.updatedAt)
+            val after = show.episodes.dropWhile { it != lastEpisode }.drop(1)
+            val next = after.firstOrNull { resume.get(it.file.uri)?.watched != true } ?: return@mapNotNull null
+            NextUp(show, next, null, lastRecord.updatedAt)
+        }.sortedByDescending { it.updatedAt }.take(limit)
+    }
+
+    fun episodeTitle(show: Show, episode: Episode): String {
+        val name = store.meta[show.key]?.episodes?.get("${episode.season}:${episode.number}")?.name
+        return "S%02dE%02d".format(episode.season, episode.number) + (name?.let { " · $it" } ?: "")
+    }
+}

@@ -27,7 +27,7 @@ import com.sine.player.data.ResumeMode
 import com.sine.player.source.Storage
 
 @Composable
-fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit = {}) {
+fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit = {}, onLibrary: () -> Unit = {}) {
     val s = SineApp.instance.settings
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
@@ -263,6 +263,16 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit
                 SettingRow("Delete after watching", "Free up space automatically once you've finished a downloaded video", s.downloadAutoDelete.label, {
                     s.downloadAutoDelete = next(com.sine.player.data.AutoDelete.entries, s.downloadAutoDelete)
                 })
+            }
+
+            item { SectionTitle("Library") }
+            item {
+                SettingRow(
+                    "Library, posters and Trakt",
+                    "Folders, TMDB key, rescan, TV home screen row, Trakt sync",
+                    "${com.sine.player.SineApp.instance.library.roots.size} folders",
+                    onLibrary,
+                )
             }
 
             item { SectionTitle("Files") }

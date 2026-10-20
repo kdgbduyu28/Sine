@@ -77,6 +77,9 @@ fun HomeScreen(
     onManageProfiles: () -> Unit = {},
     onOtherTvs: () -> Unit = {},
     onPlayFrom: (uri: String, title: String?, folder: String?, positionMs: Long, followPeer: String?) -> Unit = { _, _, _, _, _ -> },
+    onLibrary: (com.sine.player.library.LibraryKind) -> Unit = {},
+    onMovie: (String) -> Unit = {},
+    onShow: (String) -> Unit = {},
 ) {
     val profile = SineApp.instance.profiles.active
     val household = SineApp.instance.household
@@ -254,6 +257,69 @@ fun HomeScreen(
                             Tile(com.sine.player.source.Browsers.displayName(root), null, Icons.Filled.VideoLibrary, onClick = { onBrowse(root) })
                         }
                         item { Tile("Switch profile", null, Icons.Filled.Settings, onClick = onProfiles) }
+                    }
+                }
+            }
+
+            val library = SineApp.instance.library
+            val nextUp = com.sine.player.library.Library.nextUp().filter { profile.allows(it.episode.file.uri) }
+            if (nextUp.isNotEmpty()) {
+                item { SectionTitle("Next up") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(nextUp, key = { it.episode.file.uri }) { n ->
+                            com.sine.player.library.PosterCard(
+                                library.meta[n.show.key]?.title ?: n.show.title,
+                                "S%02dE%02d".format(n.episode.season, n.episode.number),
+                                com.sine.player.library.Library.posterFor(n.show.key, n.show.localPoster),
+                                onClick = {
+                                    onPlayFrom(
+                                        n.episode.file.uri,
+                                        "${n.show.title} ${com.sine.player.library.Library.episodeTitle(n.show, n.episode)}",
+                                        n.episode.file.folder,
+                                        0,
+                                        null,
+                                    )
+                                },
+                                progress = n.record?.progress,
+                            )
+                        }
+                    }
+                }
+            }
+            val movies = library.movies.filter { profile.allows(it.file.uri) }.distinctBy { it.key }.sortedByDescending { it.addedAt }
+            if (movies.isNotEmpty()) {
+                item { SectionTitle("Movies") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(movies.take(20), key = { it.file.uri }) { m ->
+                            val meta = library.meta[m.key]
+                            com.sine.player.library.PosterCard(
+                                meta?.title ?: m.title,
+                                (meta?.year ?: m.year)?.toString(),
+                                com.sine.player.library.Library.posterFor(m.key, m.localPoster),
+                                onClick = { onMovie(m.key) },
+                                watched = SineApp.instance.resume.get(m.file.uri)?.watched == true,
+                            )
+                        }
+                        item { Tile("All movies", "${movies.size}", Icons.Filled.VideoLibrary, onClick = { onLibrary(com.sine.player.library.LibraryKind.MOVIES) }, width = 150) }
+                    }
+                }
+            }
+            val shows = library.shows.filter { profile.allows(it.folder) }.sortedByDescending { it.addedAt }
+            if (shows.isNotEmpty()) {
+                item { SectionTitle("TV shows") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(shows.take(20), key = { it.key }) { s ->
+                            com.sine.player.library.PosterCard(
+                                library.meta[s.key]?.title ?: s.title,
+                                "${s.episodes.size} episodes",
+                                com.sine.player.library.Library.posterFor(s.key, s.localPoster),
+                                onClick = { onShow(s.key) },
+                            )
+                        }
+                        item { Tile("All shows", "${shows.size}", Icons.Filled.VideoLibrary, onClick = { onLibrary(com.sine.player.library.LibraryKind.SHOWS) }, width = 150) }
                     }
                 }
             }

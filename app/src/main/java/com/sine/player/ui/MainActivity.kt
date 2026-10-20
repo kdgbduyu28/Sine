@@ -93,6 +93,9 @@ class MainActivity : ComponentActivity() {
                                 onManageProfiles = { nav.navigate("profiles/manage") },
                                 onOtherTvs = { nav.navigate("household") },
                                 onPlayFrom = playFrom,
+                                onLibrary = { nav.navigate("library/${it.name}") },
+                                onMovie = { nav.navigate("movie/${Uri.encode(it)}") },
+                                onShow = { nav.navigate("show/${Uri.encode(it)}") },
                             )
                         }
                         composable("browse/{uri}") { entry ->
@@ -135,9 +138,28 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("opensubtitles") { OpenSubtitlesScreen(onDone = { nav.popBackStack() }) }
                         composable("settings") {
-                            SettingsScreen(onOpenSubtitles = { nav.navigate("opensubtitles") }, onRemoteButtons = { nav.navigate("remote") })
+                            SettingsScreen(
+                                onOpenSubtitles = { nav.navigate("opensubtitles") },
+                                onRemoteButtons = { nav.navigate("remote") },
+                                onLibrary = { nav.navigate("library/settings") },
+                            )
                         }
                         composable("remote") { RemoteButtonsScreen() }
+                        composable("library/settings") { com.sine.player.library.LibrarySettingsScreen() }
+                        composable("library/{kind}") { entry ->
+                            val kind = com.sine.player.library.LibraryKind.entries.firstOrNull { it.name == entry.arguments?.getString("kind") } ?: com.sine.player.library.LibraryKind.MOVIES
+                            com.sine.player.library.LibraryGridScreen(kind, onMovie = { nav.navigate("movie/${Uri.encode(it)}") }, onShow = { nav.navigate("show/${Uri.encode(it)}") })
+                        }
+                        composable("movie/{key}") { entry ->
+                            com.sine.player.library.MovieDetailScreen(Uri.decode(entry.arguments?.getString("key").orEmpty())) { uri, title, folder, position ->
+                                playFrom(uri, title, folder, position ?: 0, null)
+                            }
+                        }
+                        composable("show/{key}") { entry ->
+                            com.sine.player.library.ShowDetailScreen(Uri.decode(entry.arguments?.getString("key").orEmpty())) { uri, title, folder, position ->
+                                playFrom(uri, title, folder, position ?: 0, null)
+                            }
+                        }
                         composable("capabilities") { CapabilitiesScreen() }
                     }
                 }

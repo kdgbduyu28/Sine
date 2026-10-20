@@ -82,6 +82,13 @@ class AppSettings(context: Context) {
     private var storedHouseholdCode by pref("household_code", "")
     private var storedDeviceName by pref("device_name", "")
     var rememberPerFile by pref("remember_per_file", true)
+    var tmdbApiKey by pref("tmdb_api_key", "")
+    var launcherRow by pref("launcher_row", true)
+    var traktClientId by pref("trakt_client_id", "")
+    var traktClientSecret by pref("trakt_client_secret", "")
+    var traktAccessToken by pref("trakt_access_token", "")
+    var traktRefreshToken by pref("trakt_refresh_token", "")
+    var traktExpiresAt by pref("trakt_expires_at", 0L)
     var mpvUpscaler by pref("mpv_upscaler", "")
     var mpvDeband by pref("mpv_deband", false)
     var mpvInterpolation by pref("mpv_interpolation", false)
@@ -126,6 +133,7 @@ class AppSettings(context: Context) {
                 when (value) {
                     is Boolean -> putBoolean(key, value)
                     is Int -> putInt(key, value)
+                    is Long -> putLong(key, value)
                     is Float -> putFloat(key, value)
                     is String -> putString(key, value)
                     else -> error("Unsupported preference type for $key")
@@ -149,6 +157,7 @@ class AppSettings(context: Context) {
     private fun <T> read(key: String, default: T): T = when (default) {
         is Boolean -> prefs.getBoolean(key, default) as T
         is Int -> prefs.getInt(key, default) as T
+        is Long -> prefs.getLong(key, default) as T
         is Float -> prefs.getFloat(key, default) as T
         is String -> (prefs.getString(key, default) ?: default) as T
         else -> default

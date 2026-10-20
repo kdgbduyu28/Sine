@@ -72,6 +72,13 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     }
 
     private fun openFromIntent(intent: Intent) {
+        // sine://play?uri=…&folder=…&title=… from the launcher's Continue watching row.
+        intent.data?.takeIf { it.scheme == "sine" }?.let { link ->
+            val target = link.getQueryParameter("uri") ?: return@let
+            intent.data = Uri.parse(target)
+            link.getQueryParameter("folder")?.let { intent.putExtra(EXTRA_FOLDER, it) }
+            link.getQueryParameter("title")?.let { intent.putExtra(EXTRA_TITLE, it) }
+        }
         val uri = intent.data?.toString() ?: run {
             finish()
             return
@@ -196,6 +203,15 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     override fun onProgress(item: PlayItem, positionMs: Long, durationMs: Long, state: ProgressState) {
         SineApp.instance.mediaServers.report(item.uri, positionMs, durationMs, state)
+        if (!SineApp.instance.profiles.active.kids) {
+            com.sine.player.library.WatchNext.update(this, item.uri, item.title, item.folderUri, positionMs, durationMs)
+        }
+        val action = when (state) {
+            ProgressState.PLAYING -> "start"
+            ProgressState.PAUSED -> "pause"
+            ProgressState.STOPPED -> "stop"
+        }
+        SineApp.instance.scope.launch { runCatching { com.sine.player.trakt.Trakt.scrobble(item.uri, action, positionMs, durationMs) } }
     }
 
     // region Refresh-rate matching

@@ -198,6 +198,16 @@ private fun entryActions(
                         },
                     )
                 }
+                add(MenuAction("Add to library as Movies", "Posters and details for every movie in here and below") {
+                    app.library.addRoot(com.sine.player.library.LibraryRoot(entry.uri, com.sine.player.library.LibraryKind.MOVIES))
+                    notify("Added. Scanning…")
+                    app.scope.launch { com.sine.player.library.Library.scan() }
+                })
+                add(MenuAction("Add to library as TV shows", "One show per folder, or this folder is one show") {
+                    app.library.addRoot(com.sine.player.library.LibraryRoot(entry.uri, com.sine.player.library.LibraryKind.SHOWS))
+                    notify("Added. Scanning…")
+                    app.scope.launch { com.sine.player.library.Library.scan() }
+                })
                 add(MenuAction("Download all videos", "This folder only") {
                     download { "${Downloads.enqueueFolder(context, entry.uri, includeSubfolders = false)} videos added to Downloads" }
                 })
