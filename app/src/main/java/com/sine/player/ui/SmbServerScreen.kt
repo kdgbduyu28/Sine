@@ -41,6 +41,7 @@ fun SmbServerScreen(serverId: String?, onDone: () -> Unit) {
     var username by remember { mutableStateOf(existing?.username.orEmpty()) }
     var password by remember { mutableStateOf(existing?.password.orEmpty()) }
     var domain by remember { mutableStateOf(existing?.domain.orEmpty()) }
+    var wakeMac by remember { mutableStateOf(existing?.wakeMac.orEmpty()) }
     var status by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -55,6 +56,7 @@ fun SmbServerScreen(serverId: String?, onDone: () -> Unit) {
         username = username.trim(),
         password = password,
         domain = domain.trim(),
+        wakeMac = wakeMac.trim(),
     )
     val valid = host.isNotBlank() && share.isNotBlank()
 
@@ -65,6 +67,7 @@ fun SmbServerScreen(serverId: String?, onDone: () -> Unit) {
             TvTextField("Username", username, { username = it }, placeholder = "Leave empty for guest access")
             TvTextField("Password", password, { password = it }, password = true)
             TvTextField("Domain (optional)", domain, { domain = it }, placeholder = "WORKGROUP")
+            TvTextField("Wake-on-LAN MAC address (optional)", wakeMac, { wakeMac = it }, placeholder = "AA:BB:CC:DD:EE:FF, to wake a sleeping NAS")
             TvTextField("Display name (optional)", name, { name = it }, placeholder = "Living room NAS")
 
             status?.let {

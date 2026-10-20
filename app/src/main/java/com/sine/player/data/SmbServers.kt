@@ -15,6 +15,8 @@ data class SmbServer(
     val username: String = "",
     val password: String = "",
     val domain: String = "",
+    /** MAC address for Wake-on-LAN; empty when not used. */
+    val wakeMac: String = "",
 ) {
     val displayName: String get() = name.ifBlank { "$host/$share" }
 
@@ -74,7 +76,8 @@ class SmbServers(context: Context) {
                     .put("share", it.share)
                     .put("username", it.username)
                     .put("password", it.password)
-                    .put("domain", it.domain),
+                    .put("domain", it.domain)
+                    .put("wakeMac", it.wakeMac),
             )
         }
         prefs.edit { putString("servers", array.toString()) }
@@ -93,6 +96,7 @@ class SmbServers(context: Context) {
                 username = o.optString("username"),
                 password = o.optString("password"),
                 domain = o.optString("domain"),
+                wakeMac = o.optString("wakeMac"),
             )
         }
     }.getOrDefault(emptyList())

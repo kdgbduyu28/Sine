@@ -26,6 +26,8 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 **Away from home:** Settings → Playback → Server streaming quality asks Jellyfin, Emby or Plex to convert to 2–40 Mbps HLS. By default only servers that aren't on the home network (private IPs, `.local` names) are converted; embedded text subtitles may not come through a conversion, external ones do.
 
+**Sleeping NAS:** give an SMB share or server its MAC address (Wake-on-LAN field) and Sine wakes it when you browse or play from it, waiting up to 45 seconds for it to answer. Wake-on-LAN must be on in the NAS.
+
 ### Server notes
 
 - **NFS:** Android apps can't use ports below 1024, so the export must allow non-privileged ports (`insecure` in `/etc/exports`; Synology: "Allow connections from non-privileged ports").

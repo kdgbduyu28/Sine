@@ -85,6 +85,7 @@ fun ServerScreen(kind: ServerKind, serverId: String?, onDone: () -> Unit) {
     var path by remember { mutableStateOf(existing?.path.orEmpty()) }
     var username by remember { mutableStateOf(existing?.username.orEmpty()) }
     var password by remember { mutableStateOf(existing?.password.orEmpty()) }
+    var wakeMac by remember { mutableStateOf(existing?.wakeMac.orEmpty()) }
     var token by remember { mutableStateOf(existing?.token.orEmpty()) }
     var userId by remember { mutableStateOf(existing?.userId.orEmpty()) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -114,6 +115,7 @@ fun ServerScreen(kind: ServerKind, serverId: String?, onDone: () -> Unit) {
         password = if (isMediaServer) "" else password,
         token = token,
         userId = userId,
+        wakeMac = wakeMac.trim(),
     )
 
     fun run(label: String, block: suspend () -> String) {
@@ -176,6 +178,7 @@ fun ServerScreen(kind: ServerKind, serverId: String?, onDone: () -> Unit) {
                     TvTextField("Password", password, { password = it }, password = true)
                 }
             }
+            TvTextField("Wake-on-LAN MAC address (optional)", wakeMac, { wakeMac = it }, placeholder = "AA:BB:CC:DD:EE:FF, to wake a sleeping NAS")
             TvTextField("Display name (optional)", name, { name = it }, placeholder = "Living room NAS")
 
             plexCode?.let { code ->

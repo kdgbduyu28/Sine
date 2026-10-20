@@ -36,6 +36,8 @@ data class RemoteServer(
     val password: String = "",
     val token: String = "",
     val userId: String = "",
+    /** MAC address for Wake-on-LAN; empty when not used. */
+    val wakeMac: String = "",
 ) {
     val displayName: String get() = name.ifBlank { address.substringAfter("://").trimEnd('/') + path.takeIf { kind == ServerKind.NFS }.orEmpty() }
 
@@ -140,7 +142,8 @@ class RemoteServers(context: Context) {
                     .put("username", it.username)
                     .put("password", it.password)
                     .put("token", it.token)
-                    .put("userId", it.userId),
+                    .put("userId", it.userId)
+                    .put("wakeMac", it.wakeMac),
             )
         }
         prefs.edit { putString("servers", array.toString()) }
@@ -163,6 +166,7 @@ class RemoteServers(context: Context) {
                 password = o.optString("password"),
                 token = o.optString("token"),
                 userId = o.optString("userId"),
+                wakeMac = o.optString("wakeMac"),
             )
         }
     }.getOrDefault(emptyList())

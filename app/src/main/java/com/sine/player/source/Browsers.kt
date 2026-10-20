@@ -58,6 +58,8 @@ object Browsers {
             val app = SineApp.instance
             val parsed = Uri.parse(uri)
             val scheme = parsed.scheme.orEmpty()
+            // A NAS asleep: wake it (when it has a MAC address set) before trying to list.
+            com.sine.player.net.WakeOnLan.ensureAwake(uri)
             val entries = when (scheme) {
                 "file" -> listLocal(File(parsed.path ?: "/"), showHidden)
                 "smb" -> listSmb(parsed, showHidden)

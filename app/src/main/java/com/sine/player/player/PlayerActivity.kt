@@ -41,6 +41,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     private var displayListener: DisplayManager.DisplayListener? = null
     private var pendingModeId = 0
     private var finishedByPlayback = false
+    private var wakeChecked = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -134,6 +135,18 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         val externalSubs = externalSubtitles(intent)
         val needsLookup = Uri.parse(uri).scheme in lookupSchemes
 
+        // A sleeping NAS (with a MAC address set): wake it first, then open as usual.
+        if (!wakeChecked && Downloads.store.finished(uri) == null && com.sine.player.net.WakeOnLan.targetFor(uri) != null) {
+            lifecycleScope.launch {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.sine.player.net.WakeOnLan.ensureAwake(uri) { runOnUiThread { session.notice = "Waking up the NAS…" } }
+                }
+                wakeChecked = true
+                openFromIntent(intent)
+                wakeChecked = false
+            }
+            return
+        }
         if (folder == null && (!needsLookup || Downloads.store.finished(uri) != null)) {
             session.start(listOf(SubtitleCache.attach(Downloads.localize(PlayItem(uri, title, null, externalSubs)))), 0, startPosition)
             return
