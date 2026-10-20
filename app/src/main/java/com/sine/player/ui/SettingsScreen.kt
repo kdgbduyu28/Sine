@@ -56,6 +56,14 @@ fun SettingsScreen(
             item { SectionTitle("Audio & video") }
             item {
                 SettingRow(
+                    "HDR on a TV without HDR",
+                    "Switch HDR10/HLG videos to mpv, which converts them to SDR so colours don't look washed out",
+                    if (s.toneMapHdr) "Convert" else "Play as is",
+                    { s.toneMapHdr = !s.toneMapHdr },
+                )
+            }
+            item {
+                SettingRow(
                     "Audio passthrough",
                     "Send Dolby Digital+, Atmos, TrueHD and DTS untouched to your soundbar or receiver. Turn off if you get silence.",
                     onOff(s.passthrough),

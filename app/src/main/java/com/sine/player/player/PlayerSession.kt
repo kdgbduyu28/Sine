@@ -364,12 +364,30 @@ class PlayerSession(
         buildEngine(position, kind)
     }
 
+    /** Set once an HDR file needed mapping: later mpv engines in this session map too. */
+    private var toneMapping = false
+    private var toneMapDeclinedFor: String? = null
+    private val displayHdrTypes by lazy { ToneMap.displayHdrTypes(com.sine.player.SineApp.instance) }
+
+    /** Media3 just met an HDR stream: if the TV can't show HDR, hand over to mpv to tone-map it. */
+    private fun checkToneMapping(format: Format) {
+        if (!settings.toneMapHdr || engine?.kind != EngineKind.MEDIA3 || !MpvSupport.available) return
+        if (!ToneMap.needed(format.colorInfo?.colorTransfer, displayHdrTypes)) return
+        // The viewer chose Media3 for this file by hand: leave it.
+        val item = this.current ?: return
+        if (toneMapDeclinedFor == item.uri || memory?.get(item.uri)?.engine == EngineKind.MEDIA3.name) return
+        toneMapping = true
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            switchEngine(EngineKind.MPV, "This TV can't show HDR, so mpv is converting it to SDR")
+        }
+    }
+
     private fun buildEngine(positionMs: Long, kind: EngineKind) {
         engine?.release()
         // A new engine starts with default track selection; re-apply this file's choices.
         restoredFor = null
         resetEngineInfo()
-        val options = PlayerFactory.options(settings, baseLayerOnly)
+        val options = PlayerFactory.options(settings, baseLayerOnly).let { if (toneMapping && kind == EngineKind.MPV) ToneMap.apply(it) else it }
         val built = host.createEngine(kind, options, { subtitleDelayMs * 1000 }, { audioDelayMs * 1000 })
         val p = built.player
         p.addListener(listener)
@@ -401,6 +419,7 @@ class PlayerSession(
         val target = to ?: current.kind.other
         // A switch from the panel (no target, no reason) is the user's choice for this file.
         if (to == null && reason == null) remember { it.copy(engine = target.name) }
+        if (to == null && reason == null && target == EngineKind.MEDIA3) toneMapDeclinedFor = this.current?.uri
         if (target == EngineKind.MPV && !MpvSupport.available) {
             notice = "mpv needs Android 8.0 or newer."
             return
@@ -1015,6 +1034,7 @@ class PlayerSession(
 
         override fun onVideoInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?) {
             videoFormat = format
+            checkToneMapping(format)
         }
 
         override fun onAudioInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?) {
