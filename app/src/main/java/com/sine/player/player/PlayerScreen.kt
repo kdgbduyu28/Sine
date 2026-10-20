@@ -289,6 +289,19 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             SeekThumbnail(session, Modifier.align(Alignment.BottomCenter).padding(bottom = 190.dp))
         }
 
+        // A few seconds of title and format badges once the video is up.
+        val startItem = session.current?.uri
+        var startShownFor by remember { mutableStateOf<String?>(null) }
+        if (settings.startCard && startItem != null && startShownFor != startItem && session.videoFormat != null &&
+            panel == null && !overlay && !session.inPictureInPicture
+        ) {
+            StartCard(session, Modifier.align(Alignment.TopStart))
+            LaunchedEffect(startItem) {
+                delay(5_000)
+                startShownFor = startItem
+            }
+        }
+
         if (panel == null && !overlay && !session.inPictureInPicture) {
             if (session.upNext != null) UpNextCard(session, Modifier.align(Alignment.BottomEnd)) else SkipButton(session, Modifier.align(Alignment.BottomEnd))
         }

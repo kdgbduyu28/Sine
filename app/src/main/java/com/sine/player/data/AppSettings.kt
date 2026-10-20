@@ -95,6 +95,8 @@ class AppSettings(context: Context) {
     var seekStepSeconds by pref("seek_step", 10)
     var autoplayNext by pref("autoplay_next", true)
     var upNextCard by pref("up_next_card", true)
+    /** Title and format badges for a few seconds when a video starts. */
+    var startCard by pref("start_card", true)
     /** Home row with Continue watching / Next up from Jellyfin, Emby and Plex. */
     var serverHomeRow by pref("server_home_row", true)
     /** Library grid sort/filter, see LibraryView.encode. */

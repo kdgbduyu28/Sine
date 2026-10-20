@@ -134,6 +134,21 @@ object MediaInfo {
     ).distinct().joinToString(" · ")
 
     /** Badges shown on the title bar, e.g. 4K · Dolby Vision P8 · Dolby Digital+ Atmos 5.1. */
+    /** Dolby Atmos where the stream says so: E-AC3 JOC, or "Atmos" in the track name (TrueHD carries it unflagged). */
+    fun isAtmos(format: Format): Boolean =
+        format.sampleMimeType == "audio/eac3-joc" || format.label?.contains("atmos", ignoreCase = true) == true
+
+    /** The start-of-playback card: the usual badges plus Atmos and whether audio is bitstreamed. */
+    fun startBadges(video: Format?, audio: Format?, output: String?): List<String> = buildList {
+        addAll(badges(video, audio))
+        if (audio != null && isAtmos(audio)) add("Atmos")
+        when {
+            output == null -> Unit
+            output.startsWith("Decoded") -> add("Decoded on TV")
+            else -> add("To receiver")
+        }
+    }
+
     fun badges(video: Format?, audio: Format?): List<String> = buildList {
         video?.let { v ->
             resolutionLabel(v.width, v.height)?.let(::add)

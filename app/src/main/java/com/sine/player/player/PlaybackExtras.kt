@@ -309,3 +309,23 @@ internal fun LazyListScope.sleepRows(session: PlayerSession, onDone: () -> Unit)
         }
     }
 }
+
+/** Title and what's really playing (4K · Dolby Vision · Atmos · To receiver) for a few seconds at the start. */
+@UnstableApi
+@Composable
+internal fun StartCard(session: PlayerSession, modifier: Modifier) {
+    val item = session.current ?: return
+    val badges = MediaInfo.startBadges(session.videoFormat, session.audioFormat, session.audioOutput)
+    Column(
+        modifier
+            .padding(start = 56.dp, top = 48.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xCC1A181D))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+    ) {
+        Text(item.title, style = MaterialTheme.typography.titleLarge, color = SineColors.text, maxLines = 1)
+        if (badges.isNotEmpty()) {
+            Text(badges.joinToString("  ·  "), style = MaterialTheme.typography.bodyMedium, color = SineColors.accent, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}

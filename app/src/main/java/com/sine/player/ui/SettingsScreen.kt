@@ -166,6 +166,11 @@ fun SettingsScreen(
                 })
             }
             item {
+                SettingRow("Format card at start", "Title and badges like 4K · Dolby Vision · Atmos for a few seconds when a video starts", onOff(s.startCard), {
+                    s.startCard = !s.startCard
+                })
+            }
+            item {
                 SettingRow("Up next card", "Count down to the next episode during the credits or the last 20 seconds", onOff(s.upNextCard), {
                     s.upNextCard = !s.upNextCard
                 })
