@@ -64,6 +64,7 @@ class PlayerSession(
     private val host: Host,
     val settings: AppSettings,
     private val resume: ResumeStore,
+    private val memory: com.sine.player.data.FileMemory? = null,
 ) {
     interface Host {
         fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long): Engine
@@ -120,6 +121,32 @@ class PlayerSession(
     var displayMode by mutableStateOf<String?>(null)
 
     var aspect by mutableStateOf(settings.defaultAspect)
+        private set
+
+    fun updateAspect(mode: com.sine.player.data.AspectMode) {
+        aspect = mode
+        remember { it.copy(aspect = mode) }
+    }
+
+    /** Stats overlay (blue button by default). */
+    var showStats by mutableStateOf(false)
+
+    /** Last minute of bitrate samples in Mbps, newest last. */
+    var bitrateHistory by mutableStateOf<List<Float>>(emptyList())
+        private set
+    var cacheSeconds by mutableStateOf<Double?>(null)
+        private set
+    private var loadedBytes = 0L
+    private var lastRateSampleAt = 0L
+
+    private var restoring = false
+
+    /** Saves a per-file choice for the current item (unless the user turned that off). */
+    private fun remember(change: (com.sine.player.data.FileChoices) -> com.sine.player.data.FileChoices) {
+        if (restoring || !settings.rememberPerFile) return
+        val item = current ?: return
+        memory?.update(item.uri, change)
+    }
     var speed by mutableFloatStateOf(1f)
         private set
     var subtitleDelayMs by mutableLongStateOf(0)
@@ -161,12 +188,19 @@ class PlayerSession(
                 }
             }
         }
-        val kind = if (settings.engineMode == EngineMode.MPV && MpvSupport.available) EngineKind.MPV else EngineKind.MEDIA3
+        val remembered = if (settings.rememberPerFile) memory?.get(item.uri)?.engine else null
+        val kind = when {
+            !MpvSupport.available -> EngineKind.MEDIA3
+            remembered == EngineKind.MPV.name || (remembered == null && settings.engineMode == EngineMode.MPV) -> EngineKind.MPV
+            else -> EngineKind.MEDIA3
+        }
         buildEngine(position, kind)
     }
 
     private fun buildEngine(positionMs: Long, kind: EngineKind) {
         engine?.release()
+        // A new engine starts with default track selection; re-apply this file's choices.
+        restoredFor = null
         resetEngineInfo()
         val options = PlayerFactory.options(settings, baseLayerOnly)
         val built = host.createEngine(kind, options) { subtitleDelayMs * 1000 }
@@ -196,6 +230,8 @@ class PlayerSession(
     fun switchEngine(to: EngineKind? = null, reason: String? = null) {
         val current = engine ?: return
         val target = to ?: current.kind.other
+        // A switch from the panel (no target, no reason) is the user's choice for this file.
+        if (to == null && reason == null) remember { it.copy(engine = target.name) }
         if (target == EngineKind.MPV && !MpvSupport.available) {
             notice = "mpv needs Android 8.0 or newer."
             return
@@ -320,11 +356,13 @@ class PlayerSession(
     fun setPlaybackSpeed(value: Float) {
         speed = value
         player?.setPlaybackSpeed(value)
+        remember { it.copy(speed = value) }
     }
 
     fun setSubtitleDelay(ms: Long) {
         subtitleDelayMs = ms.coerceIn(-600_000, 600_000)
         engine?.setSubtitleDelay(subtitleDelayMs)
+        remember { it.copy(subtitleDelayMs = subtitleDelayMs) }
     }
 
     fun setSecondary(cues: List<com.sine.player.subtitles.Cue>, label: String?) {
@@ -347,6 +385,7 @@ class PlayerSession(
     fun adjustSubtitleDelay(deltaMs: Long) {
         subtitleDelayMs = if (deltaMs == 0L) 0 else (subtitleDelayMs + deltaMs).coerceIn(-60_000, 60_000)
         engine?.setSubtitleDelay(subtitleDelayMs)
+        remember { it.copy(subtitleDelayMs = subtitleDelayMs) }
     }
 
     /**
@@ -416,6 +455,84 @@ class PlayerSession(
                 .setOverrideForType(TrackSelectionOverride(option.group, option.index))
         }
         p.trackSelectionParameters = params.build()
+        val choice = option?.group?.let { group ->
+            val format = group.getFormat(option.index)
+            com.sine.player.data.TrackChoice(format.language, format.label, trackMime(format), trackOptions(type).indexOfFirst { it.group == group && it.index == option.index })
+        }
+        when (type) {
+            C.TRACK_TYPE_AUDIO -> remember { it.copy(audio = choice) }
+            C.TRACK_TYPE_TEXT -> remember { it.copy(subtitle = choice, subtitlesOff = choice == null) }
+        }
+    }
+
+    private fun trackMime(format: Format): String? =
+        if (format.sampleMimeType == MimeTypes.APPLICATION_MEDIA3_CUES) format.codecs else format.sampleMimeType
+
+    private var restoredFor: String? = null
+
+    /** Once per item, re-applies what was picked last time this file played. */
+    private fun restoreChoices(newTracks: Tracks, skipSubtitle: Boolean) {
+        val item = current ?: return
+        if (!settings.rememberPerFile || newTracks.groups.isEmpty() || restoredFor == item.uri) return
+        restoredFor = item.uri
+        val saved = memory?.get(item.uri) ?: return
+        restoring = true
+        try {
+            fun apply(type: Int, choice: com.sine.player.data.TrackChoice) {
+                val options = trackOptions(type)
+                val triples = options.map { o -> o.group!!.getFormat(o.index).let { Triple(it.language, it.label, trackMime(it)) } }
+                val index = com.sine.player.data.TrackChoice.match(choice, triples) ?: return
+                if (!options[index].selected) selectTrack(type, options[index])
+            }
+            saved.audio?.let { apply(C.TRACK_TYPE_AUDIO, it) }
+            if (!skipSubtitle) {
+                if (saved.subtitlesOff) selectTrack(C.TRACK_TYPE_TEXT, null) else saved.subtitle?.let { apply(C.TRACK_TYPE_TEXT, it) }
+            }
+            if (saved.subtitleDelayMs != 0L) setSubtitleDelay(saved.subtitleDelayMs)
+            saved.aspect?.let { aspect = it }
+            if (saved.speed != 1f) setPlaybackSpeed(saved.speed)
+        } finally {
+            restoring = false
+        }
+    }
+
+    /** Runs a remote-button action; returns a short message to show, or null. */
+    fun perform(action: com.sine.player.data.RemoteAction): String? = when (action) {
+        com.sine.player.data.RemoteAction.CYCLE_SUBTITLES -> {
+            val options = trackOptions(C.TRACK_TYPE_TEXT)
+            val now = options.indexOfFirst { it.selected }
+            val next = options.getOrNull(now + 1)
+            selectTrack(C.TRACK_TYPE_TEXT, next)
+            next?.label ?: "Subtitles off"
+        }
+        com.sine.player.data.RemoteAction.CYCLE_AUDIO -> {
+            val options = trackOptions(C.TRACK_TYPE_AUDIO)
+            if (options.size < 2) "Only one audio track" else {
+                val next = options[(options.indexOfFirst { it.selected } + 1) % options.size]
+                selectTrack(C.TRACK_TYPE_AUDIO, next)
+                next.label
+            }
+        }
+        com.sine.player.data.RemoteAction.CYCLE_ASPECT -> {
+            val modes = com.sine.player.data.AspectMode.entries
+            updateAspect(modes[(modes.indexOf(aspect) + 1) % modes.size])
+            aspect.label
+        }
+        com.sine.player.data.RemoteAction.TOGGLE_STATS -> { showStats = !showStats; null }
+        com.sine.player.data.RemoteAction.SUBTITLE_EARLIER -> { adjustSubtitleDelay(-100); "Subtitle delay ${com.sine.player.util.Time.formatDelay(subtitleDelayMs)}" }
+        com.sine.player.data.RemoteAction.SUBTITLE_LATER -> { adjustSubtitleDelay(100); "Subtitle delay ${com.sine.player.util.Time.formatDelay(subtitleDelayMs)}" }
+        com.sine.player.data.RemoteAction.NEXT -> { next(); null }
+        com.sine.player.data.RemoteAction.PREVIOUS -> { previous(); null }
+        com.sine.player.data.RemoteAction.SKIP_FORWARD_LONG -> { scrub(300_000); null }
+        com.sine.player.data.RemoteAction.SKIP_BACK_LONG -> { scrub(-300_000); null }
+        com.sine.player.data.RemoteAction.SPEED_UP, com.sine.player.data.RemoteAction.SPEED_DOWN -> {
+            val i = speeds.indexOfFirst { kotlin.math.abs(it - speed) < 0.01f }.coerceAtLeast(0)
+            val step = if (action == com.sine.player.data.RemoteAction.SPEED_UP) 1 else -1
+            setPlaybackSpeed(speeds[(i + step).coerceIn(0, speeds.lastIndex)])
+            "Speed ${speed}×"
+        }
+        com.sine.player.data.RemoteAction.SWITCH_ENGINE -> { switchEngine(); null }
+        com.sine.player.data.RemoteAction.FIND_SUBTITLES, com.sine.player.data.RemoteAction.INFO -> null
     }
 
     val subtitlesOff: Boolean
@@ -426,11 +543,21 @@ class PlayerSession(
     /** Called twice a second by the screen. */
     fun tick() {
         val p = player ?: return
-        engine?.stats()?.let { stats ->
-            videoDecoder = stats.videoDecoder
-            audioDecoder = stats.audioDecoder
-            audioOutput = stats.audioOutput
-            droppedFrames = stats.droppedFrames
+        val stats = engine?.stats()
+        stats?.let {
+            videoDecoder = it.videoDecoder
+            audioDecoder = it.audioDecoder
+            audioOutput = it.audioOutput
+            droppedFrames = it.droppedFrames
+            cacheSeconds = it.cacheSeconds
+        }
+        val sampleNow = System.currentTimeMillis()
+        if (sampleNow - lastRateSampleAt >= 1000) {
+            val elapsed = if (lastRateSampleAt == 0L) 1000 else sampleNow - lastRateSampleAt
+            val mbps = stats?.bitrateBps?.let { it / 1_000_000f } ?: (loadedBytes * 8f / elapsed / 1000f)
+            loadedBytes = 0
+            lastRateSampleAt = sampleNow
+            bitrateHistory = (bitrateHistory + mbps).takeLast(60)
         }
         positionMs = p.currentPosition.coerceAtLeast(0)
         durationMs = p.duration.takeIf { it != C.TIME_UNSET } ?: 0
@@ -516,7 +643,8 @@ class PlayerSession(
         override fun onTracksChanged(newTracks: Tracks) {
             tracks = newTracks
             if (maybeSwitchForUnsupportedTracks(newTracks)) return
-            selectPendingSubtitle(newTracks)
+            val addedSubtitle = selectPendingSubtitle(newTracks)
+            restoreChoices(newTracks, skipSubtitle = addedSubtitle)
             checkPreferredSubtitles(newTracks)
             val video = newTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
             val videoIndex = video?.let { g -> (0 until g.length).firstOrNull { g.isTrackSelected(it) } }
@@ -591,12 +719,14 @@ class PlayerSession(
         mainHandler.post { switchEngine(EngineKind.MPV, reason) }
     }
 
-    private fun selectPendingSubtitle(newTracks: Tracks) {
-        val id = pendingSubtitleId ?: return
+    /** Selects a just-added subtitle once its track shows up; true when it did. */
+    private fun selectPendingSubtitle(newTracks: Tracks): Boolean {
+        val id = pendingSubtitleId ?: return false
         val group = newTracks.groups.firstOrNull { g -> g.type == C.TRACK_TYPE_TEXT && (0 until g.length).any { g.getTrackFormat(it).id?.endsWith(id) == true } }
-            ?: return
+            ?: return false
         pendingSubtitleId = null
         selectTrack(C.TRACK_TYPE_TEXT, TrackOption("", false, true, group.mediaTrackGroup, 0))
+        return true
     }
 
     private fun canUseBaseLayer(format: Format): Boolean {
@@ -655,6 +785,14 @@ class PlayerSession(
 
         override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, count: Int, elapsedMs: Long) {
             droppedFrames += count
+        }
+
+        override fun onLoadCompleted(
+            eventTime: AnalyticsListener.EventTime,
+            loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo,
+            mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
+        ) {
+            loadedBytes += loadEventInfo.bytesLoaded
         }
     }
 

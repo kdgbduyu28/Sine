@@ -134,7 +134,10 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("opensubtitles") { OpenSubtitlesScreen(onDone = { nav.popBackStack() }) }
-                        composable("settings") { SettingsScreen(onOpenSubtitles = { nav.navigate("opensubtitles") }) }
+                        composable("settings") {
+                            SettingsScreen(onOpenSubtitles = { nav.navigate("opensubtitles") }, onRemoteButtons = { nav.navigate("remote") })
+                        }
+                        composable("remote") { RemoteButtonsScreen() }
                         composable("capabilities") { CapabilitiesScreen() }
                     }
                 }

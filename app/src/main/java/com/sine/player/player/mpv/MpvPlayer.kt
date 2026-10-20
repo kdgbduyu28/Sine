@@ -108,6 +108,8 @@ class MpvPlayer(
             options.subtitleLanguage?.let { put("slang", MpvTracks.languagePreference(it)) }
         }
         opts.forEach { (key, value) -> runCatching { lib.setOptionString(key, value) } }
+        // Upscaler, shaders and mpv.conf only make sense when mpv renders on the GPU.
+        if (!options.mpvDirectOutput) options.mpvExtra.forEach { (key, value) -> runCatching { lib.setOptionString(key, value) } }
         lib.init()
         lib.addObserver(this)
         lib.addLogObserver(this)
@@ -539,6 +541,8 @@ class MpvPlayer(
             audioDecoder = audioCodec?.let { "mpv · $it" },
             audioOutput = MpvTracks.audioOutput(lib.getPropertyString("audio-params/format"), audioCodec, audioChannels),
             droppedFrames = (lib.getPropertyInt("frame-drop-count") ?: 0) + (lib.getPropertyInt("decoder-frame-drop-count") ?: 0),
+            bitrateBps = ((lib.getPropertyDouble("video-bitrate") ?: 0.0) + (lib.getPropertyDouble("audio-bitrate") ?: 0.0)).toLong().takeIf { it > 0 },
+            cacheSeconds = lib.getPropertyDouble("demuxer-cache-duration"),
         )
     }
 

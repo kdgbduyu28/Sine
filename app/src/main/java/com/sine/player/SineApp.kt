@@ -45,6 +45,10 @@ class SineApp : Application() {
         private set
     lateinit var household: Household
         private set
+    lateinit var fileMemory: com.sine.player.data.FileMemory
+        private set
+    lateinit var keyMap: com.sine.player.data.KeyMap
+        private set
 
     /** For work that should outlive a screen (syncing progress after playback ends). */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
@@ -68,6 +72,8 @@ class SineApp : Application() {
         downloads = DownloadStore(File(filesDir, "downloads.json"))
         Downloads.cleanup()
         if (downloads.nextQueued() != null) Downloads.schedule(this)
+        fileMemory = com.sine.player.data.FileMemory(this)
+        keyMap = com.sine.player.data.KeyMap(this)
         household = Household(this)
         runCatching { household.start() }
     }

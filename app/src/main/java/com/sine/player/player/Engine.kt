@@ -21,6 +21,9 @@ data class EngineStats(
     val audioDecoder: String?,
     val audioOutput: String?,
     val droppedFrames: Int,
+    /** Bits per second of the streams being played (mpv reports this). */
+    val bitrateBps: Long? = null,
+    val cacheSeconds: Double? = null,
 )
 
 /**

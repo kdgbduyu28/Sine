@@ -51,7 +51,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         }
 
         val app = SineApp.instance
-        session = PlayerSession(this, app.settings, app.resume)
+        session = PlayerSession(this, app.settings, app.resume, app.fileMemory)
         updateDisplayModeLabel()
         session.userControl = { action, position -> sendToPartner(action, position) }
         handler.post(householdTick)

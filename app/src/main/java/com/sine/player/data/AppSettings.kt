@@ -82,6 +82,11 @@ class AppSettings(context: Context) {
     private var storedHouseholdCode by pref("household_code", "")
     private var storedDeviceName by pref("device_name", "")
     var rememberPerFile by pref("remember_per_file", true)
+    var mpvUpscaler by pref("mpv_upscaler", "")
+    var mpvDeband by pref("mpv_deband", false)
+    var mpvInterpolation by pref("mpv_interpolation", false)
+    /** Shader file names, separated by "|". */
+    var mpvShaders by pref("mpv_shaders", "")
     private var storedDeviceId by pref("device_id", "")
 
     /** Stable id that media servers use to tell this TV apart from other clients. */

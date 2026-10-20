@@ -130,6 +130,24 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             return true
         }
 
+        // Buttons assigned in Settings → Remote buttons (colour keys, channel keys…).
+        val code = event.nativeKeyEvent.keyCode
+        val keyMap = com.sine.player.SineApp.instance.keyMap
+        keyMap.actionFor(code)?.let { action ->
+            when (action) {
+                com.sine.player.data.RemoteAction.FIND_SUBTITLES -> panel = Panel.SUBTITLE_SEARCH
+                com.sine.player.data.RemoteAction.INFO -> panel = if (panel == Panel.INFO) null else Panel.INFO
+                else -> session.perform(action)?.let { session.notice = it }
+            }
+            return consume()
+        }
+        if (keyMap.numberKeysJump && panel == null && session.durationMs > 0 && code in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9) {
+            val tenth = code - AndroidKeyEvent.KEYCODE_0
+            session.seekTo(session.durationMs * tenth / 10)
+            session.notice = "Jumped to ${tenth * 10}%"
+            return consume()
+        }
+
         // Media and remote shortcut keys work in every state.
         when (key) {
             Key.MediaPlayPause -> { session.togglePlay(); if (!session.isPlaying) showOverlay(); return consume() }
@@ -222,6 +240,7 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
     ) {
         VideoSurface(session, settings)
         SecondarySubtitles(session, Modifier.align(Alignment.TopCenter))
+        if (session.showStats) StatsOverlay(session, Modifier.align(Alignment.TopStart))
 
         if (session.playbackState == Player.STATE_BUFFERING && session.resumePrompt == null) {
             Spinner(Modifier.align(Alignment.Center))
@@ -648,6 +667,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 item { ActionRow("Fix timing (sync)…") { onPanel(Panel.SUBTITLE_SYNC) } }
                 item { ActionRow(if (session.secondaryLabel != null) "Second subtitle: ${session.secondaryLabel}" else "Second subtitle…") { onPanel(Panel.SUBTITLE_SECOND) } }
                 item { ActionRow("Translate…") { onPanel(Panel.SUBTITLE_TRANSLATE) } }
+                item { ExtractRow(session) }
                 item { ActionRow("Style & delay…") { onPanel(Panel.SUBTITLE_STYLE) } }
             }
         }
@@ -687,7 +707,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
 
         Panel.VIDEO -> SidePanel("Picture", focusIndex = AspectMode.entries.indexOf(session.aspect)) {
             AspectMode.entries.forEachIndexed { i, mode ->
-                item { ChoiceRow(mode.label, null, session.aspect == mode, { session.aspect = mode }, focusFor(i)) }
+                item { ChoiceRow(mode.label, null, session.aspect == mode, { session.updateAspect(mode) }, focusFor(i)) }
             }
             item {
                 StepperRow("Speed", "${session.speed}×", onStep = { d, _ ->
@@ -726,6 +746,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 add("Buffered" to "${((session.bufferedMs - session.positionMs).coerceAtLeast(0) / 1000)} s ahead")
             }
             rows.forEachIndexed { i, (label, value) -> item { InfoRow(label, value, focusFor(i)) } }
+            item { ActionRow(if (session.showStats) "Hide stats overlay" else "Show stats overlay") { session.showStats = !session.showStats } }
             engineRows(session)
             handoffRows(session, onExit)
         }

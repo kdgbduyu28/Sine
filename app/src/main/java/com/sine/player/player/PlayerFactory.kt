@@ -34,6 +34,8 @@ data class EngineOptions(
     val seekStepMs: Long,
     /** mpv only: let MediaCodec render straight to the surface (keeps HDR, no mpv-drawn subtitles). */
     val mpvDirectOutput: Boolean = false,
+    /** mpv only: options from Settings → mpv and the user's mpv.conf. */
+    val mpvExtra: Map<String, String> = emptyMap(),
 )
 
 @UnstableApi
@@ -89,6 +91,15 @@ object PlayerFactory {
         subtitleLanguage = settings.subtitleLanguage.ifEmpty { null },
         seekStepMs = settings.seekStepSeconds * 1000L,
         mpvDirectOutput = settings.mpvOutput == com.sine.player.data.MpvOutput.DIRECT,
+        mpvExtra = runCatching {
+            com.sine.player.player.mpv.MpvTweaks.options(
+                com.sine.player.SineApp.instance,
+                settings.mpvUpscaler,
+                settings.mpvDeband,
+                settings.mpvInterpolation,
+                settings.mpvShaders.split('|').filter { it.isNotBlank() }.toSet(),
+            )
+        }.getOrDefault(emptyMap()),
     )
 
     /**

@@ -27,7 +27,7 @@ import com.sine.player.data.ResumeMode
 import com.sine.player.source.Storage
 
 @Composable
-fun SettingsScreen(onOpenSubtitles: () -> Unit = {}) {
+fun SettingsScreen(onOpenSubtitles: () -> Unit = {}, onRemoteButtons: () -> Unit = {}) {
     val s = SineApp.instance.settings
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
@@ -167,6 +167,59 @@ fun SettingsScreen(onOpenSubtitles: () -> Unit = {}) {
                     if (sites.isEmpty()) "None" else sites.joinToString(", "),
                     onOpenSubtitles,
                 )
+            }
+
+            item { SectionTitle("Power tools") }
+            item {
+                SettingRow("Remember per-file choices", "Audio track, subtitle, delay, zoom, speed and engine are restored next time", onOff(s.rememberPerFile), {
+                    s.rememberPerFile = !s.rememberPerFile
+                })
+            }
+            item {
+                SettingRow("Forget per-file choices", "Clears what Sine remembered for every file", "Clear", {
+                    com.sine.player.SineApp.instance.fileMemory.clear()
+                })
+            }
+            item {
+                SettingRow("Remote buttons", "Colour, channel and number keys in the player", "${com.sine.player.SineApp.instance.keyMap.bindings.size} set", onRemoteButtons)
+            }
+            item {
+                SettingRow(
+                    "mpv upscaler",
+                    "How mpv scales video up to the screen (GPU output only)",
+                    com.sine.player.player.mpv.MpvTweaks.upscalers.firstOrNull { it.first == s.mpvUpscaler }?.second ?: s.mpvUpscaler,
+                    { s.mpvUpscaler = next(com.sine.player.player.mpv.MpvTweaks.upscalers.map { it.first }, s.mpvUpscaler) },
+                )
+            }
+            item {
+                SettingRow("mpv debanding", "Smooths colour banding in skies and gradients; costs some GPU", onOff(s.mpvDeband), { s.mpvDeband = !s.mpvDeband })
+            }
+            item {
+                SettingRow("mpv motion interpolation", "Smoother pans when the refresh rate can't be matched; can look soap-opera-like", onOff(s.mpvInterpolation), {
+                    s.mpvInterpolation = !s.mpvInterpolation
+                })
+            }
+            item {
+                val config = remember { com.sine.player.player.mpv.MpvTweaks.configFile(context) }
+                SettingRow(
+                    "mpv.conf",
+                    config?.path ?: "Put an mpv.conf in a \"Sine\" folder on internal storage or a USB drive",
+                    if (config != null) "Found" else "None",
+                    {},
+                )
+            }
+            val shaders = com.sine.player.player.mpv.MpvTweaks.shaders(context)
+            val enabled = s.mpvShaders.split('|').filter { it.isNotBlank() }.toSet()
+            if (shaders.isEmpty()) {
+                item { SettingRow("mpv shaders", "Copy .glsl shaders (FSR, Anime4K…) into Sine/shaders on internal storage or USB", "None found", {}) }
+            }
+            shaders.forEach { shader ->
+                item {
+                    SettingRow("Shader: ${shader.nameWithoutExtension}", shader.parent, onOff(shader.name in enabled), {
+                        val updated = if (shader.name in enabled) enabled - shader.name else enabled + shader.name
+                        s.mpvShaders = updated.joinToString("|")
+                    })
+                }
             }
 
             item { SectionTitle("Photos") }

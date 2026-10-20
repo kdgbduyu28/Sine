@@ -230,6 +230,20 @@ private fun entryActions(
                 if (record?.watched != true) {
                     add(MenuAction("Mark as watched") { app.resume.markWatched(entry.uri, entry.title, folder) })
                 }
+                if (!kids) {
+                    add(MenuAction("Extract embedded subtitles", "Saves SRT/ASS/PGS tracks as files. Reads the whole video, so large files take a while.") {
+                        scope.launch {
+                            notify("Extracting subtitles from ${entry.title}…")
+                            notify(
+                                runCatching { com.sine.player.tools.SubtitleExtractor.extract(context, entry.uri, entry.playUri ?: entry.uri) {} }
+                                    .fold({ if (it.isEmpty()) "No text or PGS subtitles in this file" else "Extracted ${it.size} subtitle tracks" }, { "Couldn't extract: ${it.message}" }),
+                            )
+                        }
+                    })
+                    if (app.fileMemory.get(entry.uri) != null) {
+                        add(MenuAction("Forget remembered choices", "Audio, subtitle, delay and zoom for this file") { app.fileMemory.update(entry.uri) { com.sine.player.data.FileChoices() } })
+                    }
+                }
             }
             entry.isAudio -> add(MenuAction("Play from here") { onPlayMusic(folder, entry.uri) })
             entry.isImage -> add(MenuAction("Slideshow from here") { onOpenPhotos(folder, entry.uri) })
