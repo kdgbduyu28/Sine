@@ -30,6 +30,44 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - **DLNA:** discovery uses SSDP multicast and needs the TV and server on the same network segment.
 - **Media server passwords** aren't stored; Sine keeps the access token from signing in.
 
+## Phase 3: library
+
+- **Library folders** from any source (hold OK on a folder → Add to library as Movies or TV shows). Titles, years, seasons and episodes come from file and folder names; samples and extras are skipped. Rescans every 12 hours or on demand.
+- **Posters and details** from TMDB with your own API key (v3 key or v4 token); a local `poster.jpg`/`folder.jpg` works without one.
+- **Home rows:** Next up, Movies, TV shows; poster grids; movie and show pages with resume, start over, watched and seasons.
+- **TV launcher:** Continue watching / Play next entries that reopen Sine where you left off.
+- **Trakt:** sign in with your own Trakt API app; scrobbling and two-way watched sync.
+
+## Phase 4: playback extras
+
+- **Chapters** from MKV files: chapter list, marks on the seek bar, next/previous chapter buttons.
+- **Skip intro / recap / credits** using Jellyfin's media segments or chapter names: a button (OK skips; on credits it goes to the next episode) or automatic.
+- **Seek previews:** a thumbnail and chapter name while scrubbing.
+- **Audio sync** offset, remembered per file. **Night mode** (evens out loud and quiet) and **dialogue boost** (louder centre channel on 5.1/7.1); both turn passthrough off.
+- **Blu-ray/DVD ISO** files play through mpv (local files only).
+- **Picture:** brightness, contrast, saturation and gamma (mpv), and screenshots to `Pictures/Sine`.
+
+## Phase 5: phones and the living room
+
+- **Receive from phones:** with Settings → Casting on, Sine is a DLNA "play to" screen for BubbleUPnP, Web Video Caster, NAS apps and similar. Starting playback while Sine is in the background needs "Display over other apps".
+- **Search** by typing or voice over the library and recent files; Android TV's global search and Assistant can find library titles too (Google TV no longer asks apps, so there use Sine's own search).
+- **Picture-in-picture** when you press Home during a video, on TVs that support it.
+- **Backup and restore** of settings, servers, profiles, button map, resume points and library folders, to the TV or a USB drive. The file contains server passwords and tokens.
+
+## Phase 6: releases and updates
+
+- One APK per CPU type (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) plus a universal one.
+- Pushing a `v*` tag builds signed APKs on GitHub Actions and attaches them to a GitHub release.
+- Settings → About → **Check for updates** downloads the APK for the TV's CPU from the latest release and opens the installer.
+- **Diagnostics:** the last crash is kept; Save a log writes the app log to `Sine/logs` for bug reports.
+
+## Phase 7: Live TV
+
+- **M3U / IPTV playlists** from a URL or file, with groups, logos, channel numbers and an XMLTV guide (from `url-tvg` or a URL you enter, gzip OK).
+- **HDHomeRun tuners**, found automatically or by IP, with their guide.
+- Channels with now/next, a four-hour guide grid, favourites (long-press OK), and channel ▲▼ zapping in the player.
+- Not yet: Jellyfin/Plex Live TV, catch-up, recording, and playlists that need custom HTTP headers (`url|User-Agent=…`).
+
 ## Phase 8: music and photos
 
 - **Music:** pick a track (or hold OK on a folder → Play music) to play the folder in order, in the background while you browse. Shuffle/repeat, album art (embedded or `cover.jpg`/`folder.jpg`), queue, and synced lyrics from a `.lrc` next to the track. The TV's media keys and "Now playing" card work through a media session.
@@ -89,6 +127,20 @@ If the TV hides the "All files access" setting:
 adb shell appops set com.sine.player MANAGE_EXTERNAL_STORAGE allow
 ```
 
+### Release builds
+
+Create a keystore once and keep it safe (losing it means users must uninstall to update):
+
+```bash
+keytool -genkeypair -v -keystore sine-release.jks -alias sine -keyalg RSA -keysize 4096 -validity 10000
+```
+
+For local release builds, put `storeFile`, `storePassword`, `keyAlias` and `keyPassword` in `keystore.properties` (gitignored). For GitHub releases, add the repository secrets `SINE_KEYSTORE_BASE64` (`base64 -i sine-release.jks`), `SINE_KEYSTORE_PASSWORD`, `SINE_KEY_ALIAS` and `SINE_KEY_PASSWORD`, then tag:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
 ## Licence note
 
 The bundled FFmpeg and libmpv are GPL/LGPL, so a distributed build of Sine has to be GPL-compatible.
@@ -97,15 +149,15 @@ The bundled FFmpeg and libmpv are GPL/LGPL, so a distributed build of Sine has t
 
 1. ~~Media3 + FFmpeg audio, DV fallback, passthrough, subtitles, frame-rate matching, local/USB/SMB, resume.~~ Done.
 2. ~~libmpv fallback engine; Jellyfin/Plex/Emby, WebDAV, NFS, SFTP and DLNA browsing; OpenSubtitles search.~~ Done.
-3. Library with posters, home-screen rows, DV profile 7 → 8.1 conversion, watched sync with Trakt.
-4. Playback extras: skip intro/credits, chapters, seek thumbnails, audio delay, night mode, Blu-ray/DVD ISO.
-5. Phone and living room: cast/"play to" Sine, voice search, picture-in-picture, settings backup.
-6. Release polish: per-device APKs, signing, GitHub Releases, update checks, log export.
-7. Live TV: M3U/IPTV with a guide, Jellyfin/Plex Live TV, HDHomeRun.
+3. ~~Library with posters, home-screen rows, watched sync with Trakt.~~ Done, except DV profile 7 → 8.1 conversion.
+4. ~~Playback extras: skip intro/credits, chapters, seek thumbnails, audio delay, night mode, Blu-ray/DVD ISO.~~ Written.
+5. ~~Phone and living room: "play to" Sine, voice search, picture-in-picture, settings backup.~~ Written.
+6. ~~Release polish: per-device APKs, signing, GitHub Releases, update checks, log export.~~ Written.
+7. ~~Live TV: M3U/IPTV with a guide, HDHomeRun.~~ Written; Jellyfin/Plex Live TV not yet.
 8. ~~Music and photos.~~ Done.
 9. ~~Downloads and offline.~~ Done.
 10. ~~Smart subtitles.~~ Done.
 11. ~~Profiles, kids mode, other TVs.~~ Done.
 12. ~~Power tools.~~ Done.
 
-Phases 2 and 8–12 have only been checked by builds and unit tests, not on a TV yet.
+Phases 2, 3 and 8–12 have been checked by builds and unit tests, not on a TV yet. Phases 4–7 are written but have **not been compiled or tested** yet.
