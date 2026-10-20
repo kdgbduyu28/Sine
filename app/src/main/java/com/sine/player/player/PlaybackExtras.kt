@@ -329,3 +329,11 @@ internal fun StartCard(session: PlayerSession, modifier: Modifier) {
         }
     }
 }
+
+/** "Press Back again to stop": a second Back within [WINDOW_MS] leaves. */
+object BackConfirm {
+    const val WINDOW_MS = 2_000L
+
+    fun needsSecondPress(enabled: Boolean, playing: Boolean, hasError: Boolean, armedAt: Long, now: Long): Boolean =
+        enabled && playing && !hasError && now - armedAt > WINDOW_MS
+}

@@ -223,10 +223,16 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
         return false
     }
 
+    var backArmedAt by remember { mutableLongStateOf(0L) }
     BackHandler {
         when {
             panel != null -> panel = null
             overlay && session.error == null -> overlay = false
+            // While playing, a single stray Back doesn't end the film.
+            BackConfirm.needsSecondPress(settings.confirmExit, session.isPlaying, session.error != null, backArmedAt, System.currentTimeMillis()) -> {
+                backArmedAt = System.currentTimeMillis()
+                session.notice = "Press Back again to stop"
+            }
             else -> onExit()
         }
     }

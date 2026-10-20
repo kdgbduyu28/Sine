@@ -97,6 +97,8 @@ class AppSettings(context: Context) {
     var upNextCard by pref("up_next_card", true)
     /** Title and format badges for a few seconds when a video starts. */
     var startCard by pref("start_card", true)
+    /** While playing, Back asks for a second press before stopping. */
+    var confirmExit by pref("confirm_exit", true)
     var fileThumbnails by enumPref("file_thumbnails", com.sine.player.ui.ThumbnailMode.LOCAL)
     /** Home row with Continue watching / Next up from Jellyfin, Emby and Plex. */
     var serverHomeRow by pref("server_home_row", true)

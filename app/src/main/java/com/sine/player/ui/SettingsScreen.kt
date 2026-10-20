@@ -166,6 +166,11 @@ fun SettingsScreen(
                 })
             }
             item {
+                SettingRow("Press Back twice to stop", "A single Back while a video plays only shows a reminder", onOff(s.confirmExit), {
+                    s.confirmExit = !s.confirmExit
+                })
+            }
+            item {
                 SettingRow("Format card at start", "Title and badges like 4K · Dolby Vision · Atmos for a few seconds when a video starts", onOff(s.startCard), {
                     s.startCard = !s.startCard
                 })
