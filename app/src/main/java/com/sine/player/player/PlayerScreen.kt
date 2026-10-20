@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
@@ -137,6 +138,25 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
         fun consume(): Boolean {
             swallowUp += key
             return true
+        }
+        session.noteUserInput()
+
+        // "Still watching?" takes every key: OK carries on, Back leaves.
+        if (session.stillWatchingPrompt) {
+            when (key) {
+                Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.MediaPlay, Key.MediaPlayPause -> session.confirmStillWatching()
+                Key.Back, Key.Escape -> onExit()
+                else -> Unit
+            }
+            return consume()
+        }
+        // Up next card: OK plays now, Back stops at the end of this one.
+        if (session.upNext != null && panel == null && !overlay) {
+            when (key) {
+                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { session.playNextNow(); return consume() }
+                Key.Back, Key.Escape -> { session.cancelUpNext(); return consume() }
+                else -> Unit
+            }
         }
 
         // Buttons assigned in Settings → Remote buttons (colour keys, channel keys…).
@@ -270,7 +290,11 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
         }
 
         if (panel == null && !overlay && !session.inPictureInPicture) {
-            SkipButton(session, Modifier.align(Alignment.BottomEnd))
+            if (session.upNext != null) UpNextCard(session, Modifier.align(Alignment.BottomEnd)) else SkipButton(session, Modifier.align(Alignment.BottomEnd))
+        }
+
+        if (session.stillWatchingPrompt) {
+            StillWatching(session, Modifier.align(Alignment.Center))
         }
 
         if (!overlay && session.seekTargetMs != null) {
@@ -448,6 +472,7 @@ private fun ControlsOverlay(
                 if (session.chapters.isNotEmpty()) {
                     ControlButton(Icons.Filled.FormatListNumbered, "Chapters", onClick = { onPanel(Panel.CHAPTERS) })
                 }
+                ControlButton(Icons.Filled.Bedtime, if (session.sleepChoice != null) "Sleep timer (on)" else "Sleep timer", onClick = { onPanel(Panel.SLEEP) })
                 ControlButton(Icons.Filled.Info, "Info", onClick = { onPanel(Panel.INFO) })
             }
         }
@@ -776,6 +801,10 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
             }
             pictureRows(session)
             engineRows(session)
+        }
+
+        Panel.SLEEP -> SidePanel("Sleep timer", focusIndex = SleepTimer.choices.indexOf(session.sleepChoice).let { if (it < 0) 0 else it + 1 }) {
+            sleepRows(session) { onPanel(null) }
         }
 
         Panel.CHAPTERS -> SidePanel("Chapters", focusIndex = session.chapters.indexOfLast { it.startMs <= session.positionMs }.coerceAtLeast(0)) {

@@ -242,3 +242,70 @@ internal fun LazyListScope.pictureRows(session: PlayerSession) {
         }
     }
 }
+
+/** "Up next" with a countdown, bottom right. */
+@UnstableApi
+@Composable
+internal fun UpNextCard(session: PlayerSession, modifier: Modifier) {
+    val card = session.upNext ?: return
+    Column(
+        modifier
+            .padding(end = 56.dp, bottom = 64.dp)
+            .width(360.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xE61A181D))
+            .border(2.dp, SineColors.accent, RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+    ) {
+        Text("Up next in ${card.secondsLeft} s", style = MaterialTheme.typography.labelLarge, color = SineColors.accent)
+        Text(card.title, style = MaterialTheme.typography.titleMedium, color = SineColors.text, maxLines = 2)
+        Text("OK: play now  ·  Back: stop after this", style = MaterialTheme.typography.bodySmall, color = SineColors.muted, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/** Paused after several episodes in a row with no button pressed. */
+@UnstableApi
+@Composable
+internal fun StillWatching(session: PlayerSession, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xF21A181D))
+            .padding(horizontal = 40.dp, vertical = 28.dp),
+    ) {
+        Text("Still watching?", style = MaterialTheme.typography.headlineSmall, color = SineColors.text)
+        Text(
+            session.current?.title?.let { "Paused before $it" } ?: "Paused",
+            style = MaterialTheme.typography.bodyLarge,
+            color = SineColors.muted,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text("OK: keep watching  ·  Back: stop", style = MaterialTheme.typography.bodyMedium, color = SineColors.accent, modifier = Modifier.padding(top = 14.dp))
+    }
+}
+
+/** Sleep timer choices; the time left shows on the current one. */
+@UnstableApi
+internal fun LazyListScope.sleepRows(session: PlayerSession, onDone: () -> Unit) {
+    item {
+        ChoiceRow("Off", null, session.sleepChoice == null, {
+            session.setSleepTimer(null)
+            onDone()
+        }, focusFor(0))
+    }
+    SleepTimer.choices.forEachIndexed { i, minutes ->
+        item {
+            val left = session.sleepAt?.takeIf { session.sleepChoice == minutes }?.let { ((it - System.currentTimeMillis()) / 60_000).coerceAtLeast(0) }
+            ChoiceRow(
+                SleepTimer.label(minutes),
+                left?.let { "$it min left" } ?: if (minutes == SleepTimer.END_OF_VIDEO) "Pauses when this video ends" else null,
+                session.sleepChoice == minutes,
+                {
+                    session.setSleepTimer(minutes)
+                    onDone()
+                },
+                focusFor(i + 1),
+            )
+        }
+    }
+}

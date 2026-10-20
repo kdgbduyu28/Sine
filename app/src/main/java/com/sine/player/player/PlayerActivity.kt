@@ -215,6 +215,15 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         }
     }
 
+    override fun onSleep() {
+        // Let the TV's screensaver and sleep take over.
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    override fun onWake() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
     override fun onItemReady(item: PlayItem) {
         SineApp.instance.liveTv.channelFor(item.uri)?.let { channel ->
             // Live channel: say what's on instead of looking for chapters.

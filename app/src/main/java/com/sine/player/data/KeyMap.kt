@@ -29,6 +29,7 @@ enum class RemoteAction(val label: String) {
     CHAPTER_PREVIOUS("Previous chapter"),
     SKIP_SEGMENT("Skip intro / credits"),
     SCREENSHOT("Screenshot"),
+    SLEEP_TIMER("Sleep timer (cycle)"),
 }
 
 /**

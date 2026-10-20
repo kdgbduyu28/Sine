@@ -103,6 +103,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 ## Phase 12: power tools
 
+- **Up next, still watching, sleep timer:** a countdown card before the next episode (from the start of the credits when Sine knows them, else the last 20 seconds; OK plays now, Back stops after this one); after 3 episodes in a row with no button pressed Sine pauses and asks "Still watching?"; the moon button sets a sleep timer (15–90 minutes or end of this video) that pauses and lets the TV sleep.
 - **Per-file memory:** audio track, subtitle, delay, zoom, speed and engine come back the next time a file plays.
 - **Remote buttons:** red cycles subtitles, green audio, yellow zoom, blue the stats overlay, channel ▲▼ next/previous. Number keys jump to 0–90%. Anything can be reassigned in Settings → Remote buttons.
 - **mpv tweaks:** upscaler, debanding, motion interpolation, GLSL shaders (FSR, Anime4K…) from a `Sine/shaders` folder, and your own `Sine/mpv.conf`.

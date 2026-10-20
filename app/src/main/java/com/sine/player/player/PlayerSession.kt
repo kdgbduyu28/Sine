@@ -50,7 +50,7 @@ data class TrackOption(
     val index: Int,
 )
 
-enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, SUBTITLE_SYNC, SUBTITLE_SECOND, SUBTITLE_TRANSLATE, VIDEO, INFO, CHAPTERS }
+enum class Panel { AUDIO, SUBTITLES, SUBTITLE_SEARCH, SUBTITLE_STYLE, SUBTITLE_SYNC, SUBTITLE_SECOND, SUBTITLE_TRANSLATE, VIDEO, INFO, CHAPTERS, SLEEP }
 
 data class ResumePrompt(val positionMs: Long, val durationMs: Long)
 
@@ -68,6 +68,12 @@ class PlayerSession(
 ) {
     interface Host {
         fun createEngine(kind: EngineKind, options: EngineOptions, subtitleDelayUs: () -> Long, audioDelayUs: () -> Long): Engine
+
+        /** Sleep timer ran out: let the TV's own sleep take over. */
+        fun onSleep() = Unit
+
+        /** Playback resumed after the sleep timer. */
+        fun onWake() = Unit
 
         /** Tracks are known for a new item: the host looks up chapters and skippable segments. */
         fun onItemReady(item: PlayItem) = Unit
@@ -186,6 +192,99 @@ class PlayerSession(
         picture = value
         return engine?.setPicture(value.brightness, value.contrast, value.saturation, value.gamma) ?: false
     }
+
+    // region Up next, still watching, sleep timer
+
+    data class UpNextCard(val title: String, val secondsLeft: Int)
+
+    var upNext by mutableStateOf<UpNextCard?>(null)
+        private set
+    private var upNextCancelledFor: String? = null
+
+    /** Shown after several episodes in a row with no button pressed; playback is paused. */
+    var stillWatchingPrompt by mutableStateOf(false)
+        private set
+    private var autoAdvances = 0
+
+    /** Minutes chosen (or [SleepTimer.END_OF_VIDEO]) and when it runs out. */
+    var sleepChoice by mutableStateOf<Int?>(null)
+        private set
+    var sleepAt by mutableStateOf<Long?>(null)
+        private set
+    private var slept = false
+
+    /** Any button on the remote: the viewer is still there. */
+    fun noteUserInput() {
+        autoAdvances = 0
+    }
+
+    fun playNextNow() {
+        upNext = null
+        next()
+    }
+
+    fun cancelUpNext() {
+        upNextCancelledFor = current?.uri
+        upNext = null
+        notice = "Will stop at the end"
+    }
+
+    fun confirmStillWatching() {
+        stillWatchingPrompt = false
+        autoAdvances = 0
+        play()
+    }
+
+    fun setSleepTimer(minutes: Int?) {
+        sleepChoice = minutes
+        sleepAt = minutes?.takeIf { it > 0 }?.let { System.currentTimeMillis() + it * 60_000L }
+        notice = minutes?.let { "Sleep timer: ${SleepTimer.label(it).lowercase()}" } ?: "Sleep timer off"
+    }
+
+    private fun sleepNow() {
+        sleepChoice = null
+        sleepAt = null
+        pause()
+        saveProgress()
+        slept = true
+        notice = "Sleep timer: paused"
+        host.onSleep()
+    }
+
+    private fun updateUpNext() {
+        val item = current
+        if (!settings.upNextCard || !settings.autoplayNext || !hasNext || item == null || upNextCancelledFor == item.uri || stillWatchingPrompt) {
+            upNext = null
+            return
+        }
+        val credits = segments.firstOrNull { it.type == SegmentType.CREDITS }?.startMs
+        val timing = UpNext.timing(positionMs, durationMs, credits)
+        if (timing == null) {
+            upNext = null
+            return
+        }
+        if (timing.advanceNow) {
+            if (isPlaying) {
+                // Counts like reaching the end on its own.
+                countAutoAdvance()
+                if (!stillWatchingPrompt) playNextNow()
+            }
+            return
+        }
+        upNext = UpNextCard(items[index + 1].title, timing.secondsLeft)
+    }
+
+    private fun countAutoAdvance() {
+        autoAdvances++
+        val limit = settings.stillWatchingAfter
+        if (limit > 0 && autoAdvances >= limit) {
+            pause()
+            upNext = null
+            stillWatchingPrompt = true
+        }
+    }
+
+    // endregion
 
     /** While true the player is a small corner window: no controls, panels or notices. */
     var inPictureInPicture by mutableStateOf(false)
@@ -366,6 +465,10 @@ class PlayerSession(
     }
 
     fun play() {
+        if (slept) {
+            slept = false
+            host.onWake()
+        }
         wantPlay = true
         applyPlayWhenReady()
     }
@@ -618,6 +721,10 @@ class PlayerSession(
         com.sine.player.data.RemoteAction.CHAPTER_PREVIOUS -> { seekToChapter(-1); null }
         com.sine.player.data.RemoteAction.SKIP_SEGMENT -> { skipSegment(); null }
         com.sine.player.data.RemoteAction.SCREENSHOT -> null
+        com.sine.player.data.RemoteAction.SLEEP_TIMER -> {
+            setSleepTimer(SleepTimer.cycle(sleepChoice))
+            null
+        }
         com.sine.player.data.RemoteAction.FIND_SUBTITLES, com.sine.player.data.RemoteAction.INFO -> null
     }
 
@@ -638,6 +745,8 @@ class PlayerSession(
             cacheSeconds = it.cacheSeconds
         }
         updateSegment()
+        updateUpNext()
+        sleepAt?.let { if (System.currentTimeMillis() >= it) sleepNow() }
         val sampleNow = System.currentTimeMillis()
         if (sampleNow - lastRateSampleAt >= 1000) {
             val elapsed = if (lastRateSampleAt == 0L) 1000 else sampleNow - lastRateSampleAt
@@ -711,7 +820,16 @@ class PlayerSession(
             audioFormat = null
             droppedFrames = 0
             frameRateHandledFor = null
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && !settings.autoplayNext) pause()
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                when {
+                    !settings.autoplayNext -> pause()
+                    // Back on the Up next card: stop at the end instead of moving on.
+                    previous != null && previous == upNextCancelledFor -> pause()
+                    sleepChoice == SleepTimer.END_OF_VIDEO -> sleepNow()
+                    else -> countAutoAdvance()
+                }
+            }
+            upNext = null
             val item = current ?: return
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
                 resume.get(item.uri)?.takeIf { it.resumable }?.let { record ->

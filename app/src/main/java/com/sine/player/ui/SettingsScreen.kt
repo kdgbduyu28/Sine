@@ -132,6 +132,19 @@ fun SettingsScreen(
                 })
             }
             item {
+                SettingRow("Up next card", "Count down to the next episode during the credits or the last 20 seconds", onOff(s.upNextCard), {
+                    s.upNextCard = !s.upNextCard
+                })
+            }
+            item {
+                SettingRow(
+                    "Ask \"Still watching?\"",
+                    "Pause after this many episodes in a row with no button pressed",
+                    if (s.stillWatchingAfter == 0) "Never" else "After ${s.stillWatchingAfter}",
+                    { s.stillWatchingAfter = next(listOf(0, 2, 3, 4, 5), s.stillWatchingAfter) },
+                )
+            }
+            item {
                 SettingRow("Skip step", "How far ◀ ▶ jump on the remote; hold to go faster", "${s.seekStepSeconds} s", {
                     s.seekStepSeconds = next(AppSettings.seekSteps, s.seekStepSeconds)
                 })
