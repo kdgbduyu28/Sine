@@ -166,6 +166,16 @@ fun BrowseScreen(
     }
 }
 
+/** Marks every video directly in [folder] watched (or forgets their progress); returns a message. */
+private suspend fun markFolder(folder: String, watched: Boolean): String {
+    val videos = runCatching { Browsers.list(folder) }.getOrElse { return "Couldn't open the folder: ${it.message}" }.filter { it.isVideo }
+    val resume = SineApp.instance.resume
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+        videos.forEach { v -> if (watched) resume.markWatched(v.uri, v.title, folder) else resume.forget(v.uri) }
+    }
+    return if (videos.isEmpty()) "No videos in this folder" else "${videos.size} videos marked ${if (watched) "watched" else "unwatched"}"
+}
+
 /** What "hold OK" offers for a file or folder. Later phases add their own actions here. */
 @Composable
 private fun entryActions(
@@ -215,7 +225,13 @@ private fun entryActions(
                 add(MenuAction("Download all videos and sub-folders", "Good for a whole show with season folders") {
                     download { "${Downloads.enqueueFolder(context, entry.uri, includeSubfolders = true)} videos added to Downloads" }
                 })
-                add(MenuAction("Play music in this folder") { onPlayMusic(entry.uri, null) })
+                add(MenuAction("Mark folder as watched", "Every video directly in this folder") {
+                    scope.launch { notify(markFolder(entry.uri, watched = true)) }
+                })
+                add(MenuAction("Mark folder as unwatched", "Clears progress for every video directly in this folder") {
+                    scope.launch { notify(markFolder(entry.uri, watched = false)) }
+                })
+                                add(MenuAction("Play music in this folder") { onPlayMusic(entry.uri, null) })
                 add(MenuAction("Photo slideshow") { onOpenPhotos(entry.uri, null) })
                 add(MenuAction("Use as screensaver", "Photos from this folder and its sub-folders") {
                     app.settings.screensaverFolder = entry.uri
