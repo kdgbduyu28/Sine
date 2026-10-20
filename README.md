@@ -26,6 +26,8 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 **Away from home:** Settings → Playback → Server streaming quality asks Jellyfin, Emby or Plex to convert to 2–40 Mbps HLS. By default only servers that aren't on the home network (private IPs, `.local` names) are converted; embedded text subtitles may not come through a conversion, external ones do.
 
+**Thumbnails:** video files in folder lists show a frame from about 10% in (cached); by default only for USB and internal storage, or everywhere in Settings → Files.
+
 **Folders:** hold OK on a folder → Mark folder as watched / unwatched, for shows that aren't in the library.
 
 **Another player:** hold OK on a video → Open with another app hands it to VLC, Kodi, MX Player and the like (local files as a content link, SMB with the share's login, servers as their stream URL).

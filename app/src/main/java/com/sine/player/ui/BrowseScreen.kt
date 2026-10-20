@@ -126,17 +126,20 @@ fun BrowseScreen(
                             .onFocusChanged { if (it.isFocused) focusedIndex = index }
                             .then(if (index == focusedIndex.coerceIn(0, list.lastIndex)) Modifier.focusRequester(focus) else Modifier),
                         leadingContent = {
-                            Icon(
-                                when {
-                                    entry.isDirectory -> Icons.Filled.Folder
-                                    entry.isAudio -> Icons.Filled.MusicNote
-                                    entry.isImage -> Icons.Filled.Image
-                                    else -> Icons.Filled.Movie
-                                },
-                                contentDescription = null,
-                                tint = if (entry.isDirectory) SineColors.accent else SineColors.text,
-                                modifier = Modifier.size(28.dp),
-                            )
+                            val icon: @Composable () -> Unit = {
+                                Icon(
+                                    when {
+                                        entry.isDirectory -> Icons.Filled.Folder
+                                        entry.isAudio -> Icons.Filled.MusicNote
+                                        entry.isImage -> Icons.Filled.Image
+                                        else -> Icons.Filled.Movie
+                                    },
+                                    contentDescription = null,
+                                    tint = if (entry.isDirectory) SineColors.accent else SineColors.text,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
+                            if (entry.isVideo && !entry.playable) VideoThumbnail(entry.uri, entry.size, entry.modified, icon) else icon()
                         },
                         headlineContent = { Text(entry.name, maxLines = 2) },
                         supportingContent = detail?.takeIf { it.isNotBlank() }?.let { { Text(it) } },

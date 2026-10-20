@@ -439,6 +439,11 @@ fun SettingsScreen(
                 )
             }
             item {
+                SettingRow("Video thumbnails", "A frame from each video in folder lists", s.fileThumbnails.label, {
+                    s.fileThumbnails = next(com.sine.player.ui.ThumbnailMode.entries.toList(), s.fileThumbnails)
+                })
+            }
+            item {
                 SettingRow("Show hidden files", "Files and folders starting with a dot", onOff(s.showHiddenFiles), {
                     s.showHiddenFiles = !s.showHiddenFiles
                 })
