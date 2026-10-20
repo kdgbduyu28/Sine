@@ -231,7 +231,7 @@ private fun entryActions(
                 add(MenuAction("Mark folder as unwatched", "Clears progress for every video directly in this folder") {
                     scope.launch { notify(markFolder(entry.uri, watched = false)) }
                 })
-                                add(MenuAction("Play music in this folder") { onPlayMusic(entry.uri, null) })
+                add(MenuAction("Play music in this folder") { onPlayMusic(entry.uri, null) })
                 add(MenuAction("Photo slideshow") { onOpenPhotos(entry.uri, null) })
                 add(MenuAction("Use as screensaver", "Photos from this folder and its sub-folders") {
                     app.settings.screensaverFolder = entry.uri
