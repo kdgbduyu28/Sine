@@ -54,6 +54,30 @@ enum class MpvOutput(val label: String, val description: String) {
 class AppSettings(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
+    /** Re-reads each setting after its stored value changed underneath (profile switch). Declared before the settings. */
+    private val reloaders = mutableListOf<() -> Unit>()
+
+    fun reload() = reloaders.forEach { it() }
+
+    /** The raw stored values of [keys] (absent keys left out). */
+    fun snapshot(keys: List<String>): Map<String, Any?> = prefs.all.filterKeys { it in keys }
+
+    /** Writes stored values back (types as stored), then refreshes the settings that read them. */
+    fun restore(values: Map<String, Any?>) {
+        prefs.edit {
+            values.forEach { (k, v) ->
+                when (v) {
+                    is Boolean -> putBoolean(k, v)
+                    is Int -> putInt(k, v)
+                    is Long -> putLong(k, v)
+                    is Float -> putFloat(k, v)
+                    is String -> putString(k, v)
+                }
+            }
+        }
+        reload()
+    }
+
     var passthrough by pref("passthrough", true)
     var tunneling by pref("tunneling", false)
     var frameRateMatching by pref("frame_rate_matching", true)
@@ -158,8 +182,12 @@ class AppSettings(context: Context) {
     private inline fun <reified E : Enum<E>> enumPref(key: String, default: E): EnumDelegate<E> =
         EnumDelegate(key, default) { name -> enumValues<E>().firstOrNull { it.name == name } }
 
-    inner class PrefDelegate<T>(private val key: String, default: T) {
+    inner class PrefDelegate<T>(private val key: String, private val default: T) {
         private var state by mutableStateOf(read(key, default))
+
+        init {
+            reloaders += { state = read(key, default) }
+        }
 
         operator fun getValue(thisRef: Any?, property: Any?): T = state
 
@@ -180,6 +208,10 @@ class AppSettings(context: Context) {
 
     inner class EnumDelegate<E : Enum<E>>(private val key: String, default: E, parse: (String?) -> E?) {
         private var state by mutableStateOf(parse(prefs.getString(key, null)) ?: default)
+
+        init {
+            reloaders += { state = parse(prefs.getString(key, null)) ?: default }
+        }
 
         operator fun getValue(thisRef: Any?, property: Any?): E = state
 

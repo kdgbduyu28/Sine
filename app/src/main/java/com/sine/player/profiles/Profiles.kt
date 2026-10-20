@@ -79,6 +79,8 @@ class Profiles(context: Context) {
 
     fun switchTo(id: String) {
         if (get(id) == null) return
+        // Languages and subtitle look follow the person.
+        runCatching { ProfileSettings.swap(com.sine.player.SineApp.instance, activeId, id) }
         activeId = id
         prefs.edit { putString("active", id) }
     }
