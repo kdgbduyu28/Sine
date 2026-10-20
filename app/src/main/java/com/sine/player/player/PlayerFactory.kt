@@ -38,6 +38,7 @@ data class EngineOptions(
     val mpvExtra: Map<String, String> = emptyMap(),
     val nightMode: Boolean = false,
     val dialogueBoost: Boolean = false,
+    val buffer: BufferPlan = BufferPlan.DEFAULT,
 )
 
 @UnstableApi
@@ -67,9 +68,16 @@ object PlayerFactory {
             .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
             .setConstantBitrateSeekingEnabled(true)
 
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(30_000, 60_000, 2_500, 5_000)
-            .build()
+        val loadControl = DefaultLoadControl.Builder().apply {
+            if (options.buffer.media3Bytes > 0) {
+                // Read ahead by size rather than time, so high-bitrate remuxes get a real cushion.
+                setBufferDurationsMs(30_000, options.buffer.maxBufferMs, 2_500, 5_000)
+                setTargetBufferBytes(options.buffer.media3Bytes)
+                setPrioritizeTimeOverSizeThresholds(false)
+            } else {
+                setBufferDurationsMs(30_000, 60_000, 2_500, 5_000)
+            }
+        }.build()
 
         return ExoPlayer.Builder(context, renderers)
             .setTrackSelector(trackSelector)
@@ -90,6 +98,7 @@ object PlayerFactory {
         passthrough = settings.passthrough && !settings.nightMode && !settings.dialogueBoost,
         nightMode = settings.nightMode,
         dialogueBoost = settings.dialogueBoost,
+        buffer = Buffers.forDevice(com.sine.player.SineApp.instance, settings.bufferSize),
         tunneling = settings.tunneling,
         dolbyVisionBaseLayer = dolbyVisionBaseLayer,
         audioLanguage = settings.audioLanguage.ifEmpty { null },

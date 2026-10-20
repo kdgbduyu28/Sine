@@ -100,6 +100,7 @@ class AppSettings(context: Context) {
     var rememberPerFolder by pref("remember_per_folder", true)
     /** Choose the richest audio format in the preferred language, skipping commentary. */
     var bestAudio by pref("best_audio", true)
+    var bufferSize by enumPref("buffer_size", com.sine.player.player.BufferSize.NORMAL)
     /** Media server bitrate cap in Mbps (server transcodes to HLS); 0 = original file. */
     var serverQualityMbps by pref("server_quality_mbps", 0)
     /** Apply the cap only when the server isn't on the home network. */

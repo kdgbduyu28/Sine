@@ -113,6 +113,14 @@ fun SettingsScreen(
             item { SectionTitle("Playback") }
             item {
                 SettingRow(
+                    "Buffer",
+                    s.bufferSize.description + ". Applies to the next video.",
+                    s.bufferSize.label,
+                    { s.bufferSize = next(com.sine.player.player.BufferSize.entries.toList(), s.bufferSize) },
+                )
+            }
+            item {
+                SettingRow(
                     "Server streaming quality",
                     "Jellyfin, Emby and Plex convert to this bitrate for slow connections. Original plays the file as is.",
                     com.sine.player.mediaserver.Transcode.label(s.serverQualityMbps),

@@ -110,6 +110,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 ## Phase 12: power tools
 
 - **Up next, still watching, sleep timer:** a countdown card before the next episode (from the start of the credits when Sine knows them, else the last 20 seconds; OK plays now, Back stops after this one); after 3 episodes in a row with no button pressed Sine pauses and asks "Still watching?"; the moon button sets a sleep timer (15–90 minutes or end of this video) that pauses and lets the TV sleep.
+- **Buffer size:** Settings → Playback → Buffer (Normal / Large / Huge) reads further ahead on high-bitrate remuxes over Wi-Fi or SMB, sized to the TV's memory (Media3 up to 60% of the app heap, mpv up to a quarter of RAM).
 - **Best audio track:** in your audio language (or the file's default language), Sine starts on the richest track it can play (TrueHD Atmos, DTS:X/DTS-HD MA, E-AC3 Atmos, then lossy) and never on commentary or audio description, unless you picked a track for that file or season.
 - **Per-file memory:** audio track, subtitle, delay, zoom, speed and engine come back the next time a file plays. Audio and subtitles picked on one episode also apply to the rest of its season or folder, unless an episode has its own choice.
 - **Remote buttons:** red cycles subtitles, green audio, yellow zoom, blue the stats overlay, channel ▲▼ next/previous. Number keys jump to 0–90%. Anything can be reassigned in Settings → Remote buttons.
