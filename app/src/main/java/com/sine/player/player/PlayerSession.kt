@@ -618,6 +618,31 @@ class PlayerSession(
             }
         }
 
+    /** Switches to [AudioRank]'s choice without remembering it as the viewer's own. */
+    private fun pickBestAudio() {
+        val options = trackOptions(C.TRACK_TYPE_AUDIO)
+        if (options.size < 2) return
+        val formats = options.map { it.group!!.getFormat(it.index) }
+        val candidates = options.zip(formats) { o, f ->
+            AudioCandidate(
+                f.language, f.label, f.sampleMimeType, f.channelCount.coerceAtLeast(0),
+                commentary = f.roleFlags and C.ROLE_FLAG_COMMENTARY != 0,
+                describesVideo = f.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0,
+                supported = o.supported,
+            )
+        }
+        val defaultIndex = formats.indexOfFirst { it.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0 }.takeIf { it >= 0 }
+            ?: options.indexOfFirst { it.selected }
+        val best = AudioRank.best(candidates, settings.audioLanguage.ifEmpty { null }, defaultIndex) ?: return
+        if (options[best].selected) return
+        restoring = true
+        try {
+            selectTrack(C.TRACK_TYPE_AUDIO, options[best])
+        } finally {
+            restoring = false
+        }
+    }
+
     fun selectTrack(type: Int, option: TrackOption?) {
         val p = player ?: return
         val params = p.trackSelectionParameters.buildUpon()
@@ -658,10 +683,13 @@ class PlayerSession(
     /** Once per item, re-applies what was picked last time this file played. */
     private fun restoreChoices(newTracks: Tracks, skipSubtitle: Boolean) {
         val item = current ?: return
-        if (!settings.rememberPerFile || newTracks.groups.isEmpty() || restoredFor == item.uri) return
+        if (newTracks.groups.isEmpty() || restoredFor == item.uri) return
         restoredFor = item.uri
-        val folderChoices = if (settings.rememberPerFolder) item.folderUri?.let { memory?.folder(it) } else null
-        val saved = com.sine.player.data.FileMemory.merge(memory?.get(item.uri), folderChoices) ?: return
+        val folderChoices = if (settings.rememberPerFile && settings.rememberPerFolder) item.folderUri?.let { memory?.folder(it) } else null
+        val saved = if (settings.rememberPerFile) com.sine.player.data.FileMemory.merge(memory?.get(item.uri), folderChoices) else null
+        // Nothing remembered for audio: pick the best track ourselves.
+        if (saved?.audio == null && settings.bestAudio) pickBestAudio()
+        saved ?: return
         restoring = true
         try {
             fun apply(type: Int, choice: com.sine.player.data.TrackChoice) {

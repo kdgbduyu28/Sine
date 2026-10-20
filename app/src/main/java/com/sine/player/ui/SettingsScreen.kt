@@ -170,6 +170,14 @@ fun SettingsScreen(
 
             item { SectionTitle("Languages") }
             item {
+                SettingRow(
+                    "Best audio track",
+                    "In your audio language, prefer TrueHD/DTS-HD/Atmos over lossy tracks and never start on commentary",
+                    onOff(s.bestAudio),
+                    { s.bestAudio = !s.bestAudio },
+                )
+            }
+            item {
                 SettingRow("Preferred audio language", "Picked automatically when a file has several", language(s.audioLanguage), {
                     s.audioLanguage = nextLanguage(s.audioLanguage)
                 })
