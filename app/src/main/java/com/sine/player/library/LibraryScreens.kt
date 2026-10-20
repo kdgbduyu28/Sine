@@ -106,58 +106,87 @@ fun PosterCard(title: String, subtitle: String?, poster: String?, onClick: () ->
 fun LibraryGridScreen(kind: LibraryKind, onMovie: (String) -> Unit, onShow: (String) -> Unit) {
     val store = Library.store
     val profile = SineApp.instance.profiles.active
+    val settings = SineApp.instance.settings
     val resume = SineApp.instance.resume
     resume.version.intValue
     val focus = remember { FocusRequester() }
-    var byTitle by remember { mutableStateOf(false) }
+    var view by remember {
+        mutableStateOf(LibraryView.decode(if (kind == LibraryKind.MOVIES) settings.libraryViewMovies else settings.libraryViewShows))
+    }
+    fun update(next: LibraryView) {
+        view = next
+        if (kind == LibraryKind.MOVIES) settings.libraryViewMovies = next.encode() else settings.libraryViewShows = next.encode()
+    }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Page(kind.label) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-            androidx.tv.material3.FilterChip(selected = !byTitle, onClick = { byTitle = false }) { Text("Recently added") }
-            androidx.tv.material3.FilterChip(selected = byTitle, onClick = { byTitle = true }) { Text("A–Z") }
+
+    // Movies and shows become the same kind of entry so one set of rules sorts and filters both.
+    val all: List<GridEntry<Any>> = when (kind) {
+        LibraryKind.MOVIES -> store.movies.filter { profile.allows(it.file.uri) }.distinctBy { it.key }.map { m ->
+            val meta = store.meta[m.key]
+            GridEntry<Any>(m, meta?.title ?: m.title, meta?.year ?: m.year, meta?.rating, meta?.genres.orEmpty(), m.addedAt, resume.get(m.file.uri)?.watched == true)
         }
-        when (kind) {
-            LibraryKind.MOVIES -> {
-                val movies = store.movies.filter { profile.allows(it.file.uri) }.distinctBy { it.key }
-                    .let { list -> if (byTitle) list.sortedBy { it.title.lowercase() } else list.sortedByDescending { it.addedAt } }
-                if (movies.isEmpty()) {
-                    Message("No movies yet", "Hold OK on a folder while browsing → Add to library as Movies.")
-                    return@Page
-                }
-                LazyVerticalGrid(GridCells.Adaptive(150.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(8.dp)) {
-                    items(movies, key = { it.file.uri }) { movie ->
-                        val meta = store.meta[movie.key]
-                        val record = resume.get(movie.file.uri)
-                        PosterCard(
-                            meta?.title ?: movie.title,
-                            (meta?.year ?: movie.year)?.toString(),
-                            Library.posterFor(movie.key, movie.localPoster),
-                            onClick = { onMovie(movie.key) },
-                            modifier = if (movie == movies.first()) Modifier.focusRequester(focus) else Modifier,
-                            progress = record?.takeIf { it.resumable }?.progress,
-                            watched = record?.watched == true,
-                        )
-                    }
+        LibraryKind.SHOWS -> store.shows.filter { profile.allows(it.folder) }.map { sh ->
+            val meta = store.meta[sh.key]
+            val allWatched = sh.episodes.isNotEmpty() && sh.episodes.all { resume.get(it.file.uri)?.watched == true }
+            GridEntry<Any>(sh, meta?.title ?: sh.title, meta?.year ?: sh.year, meta?.rating, meta?.genres.orEmpty(), sh.addedAt, allWatched)
+        }
+    }
+    val shown = LibraryFilter.apply(all, view)
+    val genres = remember(all.size) { LibraryFilter.genres(all) }
+
+    Page(kind.label, "${shown.size} of ${all.size}") {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            items(LibrarySort.entries.toList()) { sort ->
+                androidx.tv.material3.FilterChip(selected = view.sort == sort, onClick = { update(view.copy(sort = sort)) }) { Text(sort.label) }
+            }
+            item {
+                androidx.tv.material3.FilterChip(selected = view.unwatchedOnly, onClick = { update(view.copy(unwatchedOnly = !view.unwatchedOnly)) }) { Text("Unwatched") }
+            }
+        }
+        if (genres.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                item { androidx.tv.material3.FilterChip(selected = view.genre == null, onClick = { update(view.copy(genre = null)) }) { Text("All genres") } }
+                items(genres) { g ->
+                    androidx.tv.material3.FilterChip(selected = view.genre == g, onClick = { update(view.copy(genre = if (view.genre == g) null else g)) }) { Text(g) }
                 }
             }
-            LibraryKind.SHOWS -> {
-                val shows = store.shows.filter { profile.allows(it.folder) }
-                    .let { list -> if (byTitle) list.sortedBy { it.title.lowercase() } else list.sortedByDescending { it.addedAt } }
-                if (shows.isEmpty()) {
-                    Message("No TV shows yet", "Hold OK on a folder while browsing → Add to library as TV shows.")
-                    return@Page
-                }
-                LazyVerticalGrid(GridCells.Adaptive(150.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(8.dp)) {
-                    items(shows, key = { it.key }) { show ->
-                        val meta = store.meta[show.key]
-                        val watched = show.episodes.count { resume.get(it.file.uri)?.watched == true }
+        }
+        if (all.isEmpty()) {
+            Message(
+                if (kind == LibraryKind.MOVIES) "No movies yet" else "No TV shows yet",
+                "Hold OK on a folder while browsing → Add to library as ${kind.label}.",
+            )
+            return@Page
+        }
+        if (shown.isEmpty()) {
+            Message("Nothing matches", "Try another genre, or turn off Unwatched.")
+            return@Page
+        }
+        LazyVerticalGrid(GridCells.Adaptive(150.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(8.dp)) {
+            items(shown, key = { e -> (e.item as? Movie)?.file?.uri ?: (e.item as Show).key }) { e ->
+                val first = Modifier.focusRequester(focus).takeIf { e == shown.first() } ?: Modifier
+                when (val item = e.item) {
+                    is Movie -> {
+                        val record = resume.get(item.file.uri)
                         PosterCard(
-                            meta?.title ?: show.title,
-                            "${show.seasons.size} season${if (show.seasons.size == 1) "" else "s"} · $watched/${show.episodes.size} watched",
-                            Library.posterFor(show.key, show.localPoster),
-                            onClick = { onShow(show.key) },
-                            modifier = if (show == shows.first()) Modifier.focusRequester(focus) else Modifier,
-                            watched = watched == show.episodes.size,
+                            e.title,
+                            listOfNotNull(e.year?.toString(), e.rating?.takeIf { view.sort == LibrarySort.RATING }?.let { "★ %.1f".format(it) }).joinToString(" · ").ifEmpty { null },
+                            Library.posterFor(item.key, item.localPoster),
+                            onClick = { onMovie(item.key) },
+                            modifier = first,
+                            progress = record?.takeIf { it.resumable }?.progress,
+                            watched = e.watched,
+                        )
+                    }
+                    is Show -> {
+                        val watched = item.episodes.count { resume.get(it.file.uri)?.watched == true }
+                        PosterCard(
+                            e.title,
+                            "${item.seasons.size} season${if (item.seasons.size == 1) "" else "s"} · $watched/${item.episodes.size} watched",
+                            Library.posterFor(item.key, item.localPoster),
+                            onClick = { onShow(item.key) },
+                            modifier = first,
+                            watched = e.watched,
                         )
                     }
                 }

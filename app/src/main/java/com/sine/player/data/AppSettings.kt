@@ -70,6 +70,9 @@ class AppSettings(context: Context) {
     var upNextCard by pref("up_next_card", true)
     /** Home row with Continue watching / Next up from Jellyfin, Emby and Plex. */
     var serverHomeRow by pref("server_home_row", true)
+    /** Library grid sort/filter, see LibraryView.encode. */
+    var libraryViewMovies by pref("library_view_movies", "")
+    var libraryViewShows by pref("library_view_shows", "")
     /** Ask "Still watching?" after this many episodes in a row with no button pressed; 0 = never. */
     var stillWatchingAfter by pref("still_watching_after", 3)
     var showHiddenFiles by pref("show_hidden", false)
