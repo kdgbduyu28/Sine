@@ -351,6 +351,11 @@ fun SettingsScreen(
 
             item { SectionTitle("Library") }
             item {
+                SettingRow("Rows from your servers", "Continue watching and Next up from Jellyfin, Emby and Plex on the home screen", onOff(s.serverHomeRow), {
+                    s.serverHomeRow = !s.serverHomeRow
+                })
+            }
+            item {
                 SettingRow(
                     "Library, posters and Trakt",
                     "Folders, TMDB key, rescan, TV home screen row, Trakt sync",

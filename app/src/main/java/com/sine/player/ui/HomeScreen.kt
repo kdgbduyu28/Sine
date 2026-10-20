@@ -124,6 +124,18 @@ fun HomeScreen(
             onBrowse(it.uri)
         }
     }
+    var serverItems by remember { mutableStateOf(emptyList<com.sine.player.mediaserver.ServerHomeItem>()) }
+    LaunchedEffect(Unit) {
+        val app = SineApp.instance
+        if (!app.settings.serverHomeRow || app.profiles.active.kids) return@LaunchedEffect
+        serverItems = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.sine.player.mediaserver.ServerHome.order(
+                app.remoteServers.servers.filter { it.kind.isMediaServer }.flatMap { server ->
+                    runCatching { com.sine.player.mediaserver.ServerHome.load(server, app.settings.deviceId()) }.getOrDefault(emptyList())
+                },
+            ).take(30)
+        }
+    }
     LaunchedEffect(Unit) {
         runCatching { firstFocus.requestFocus() }
         // Picks up music that kept playing in the background.
@@ -249,6 +261,17 @@ fun HomeScreen(
                                 modifier = if (record == continueWatching.first()) Modifier.focusRequester(firstFocus) else Modifier,
                             )
                         }
+                    }
+                }
+            }
+
+            // Things already in Sine's own Continue watching aren't repeated.
+            val fromServers = serverItems.filter { s -> continueWatching.none { it.uri == s.entry.uri } }
+            if (fromServers.isNotEmpty()) {
+                item { SectionTitle("From your servers") }
+                item {
+                    com.sine.player.mediaserver.ServerHomeRow(fromServers) { s ->
+                        onPlayFrom(s.entry.uri, s.title + (s.subtitle?.let { " $it" } ?: ""), s.folder, s.entry.remote?.positionMs ?: 0, null)
                     }
                 }
             }
