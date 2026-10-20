@@ -90,6 +90,28 @@ object MediaFiles {
             .sortedWith(compareBy({ it.forced }, { it.label }))
     }
 
+    /** The release's subtitle folder among a folder's sub-folders ("Subs", "Subtitles"), if any. */
+    fun subsFolder(folderNames: List<String>): String? =
+        folderNames.firstOrNull { it.equals("subs", true) || it.equals("subtitles", true) || it.equals("sub", true) }
+
+    /**
+     * Subtitle files from a Subs folder, where names describe only the language
+     * ("2_English.srt", "eng.forced.srt", "French (SDH).ass") rather than repeating the video's.
+     */
+    fun folderSidecars(fileNames: List<String>): List<Sidecar> = fileNames.filter(::isSubtitle).map { file ->
+        val tags = baseName(file).split('.', '_', '-', ' ', '(', ')', '[', ']').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val forced = "forced" in tags
+        val sdh = "sdh" in tags || "cc" in tags || "hi" in tags
+        val language = tags.firstOrNull { it in languageNames }
+        val parts = buildList {
+            add(language?.let { languageNames[it] } ?: baseName(file))
+            if (forced) add("Forced")
+            if (sdh) add("SDH")
+            add(extension(file).uppercase())
+        }
+        Sidecar(file, language?.let { isoCode(it) }, forced, parts.joinToString(" · "))
+    }.sortedWith(compareBy({ it.forced }, { it.label }))
+
     private fun isoCode(tag: String): String = when (tag) {
         "eng", "english" -> "en"
         "jpn", "jap", "japanese" -> "ja"

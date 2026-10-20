@@ -176,9 +176,28 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
     private suspend fun buildQueue(folder: String): List<PlayItem> {
         val entries = Browsers.list(folder)
         val names = if (Browsers.hasSidecars(folder)) entries.filter { !it.isDirectory }.map { it.name } else emptyList()
-        return entries.filter { it.isVideo }.map { video ->
+        // Releases often keep subtitles in Subs/ (films) or Subs/<episode name>/ (shows).
+        val subsDir = if (Browsers.hasSidecars(folder)) MediaFiles.subsFolder(entries.filter { it.isDirectory }.map { it.name }) else null
+        val subsUri = subsDir?.let { Browsers.child(folder, it) }
+        val subsEntries = subsUri?.let { runCatching { Browsers.list(it) }.getOrDefault(emptyList()) }.orEmpty()
+        val videos = entries.filter { it.isVideo }
+        return videos.map { video ->
             val sidecars = MediaFiles.findSidecars(video.name, names).map {
                 PlayerSession.sidecarConfig(Browsers.child(folder, it.fileName), it)
+            }.toMutableList()
+            if (subsUri != null) {
+                val perVideo = subsEntries.firstOrNull { it.isDirectory && it.name.equals(MediaFiles.baseName(video.name), ignoreCase = true) }
+                when {
+                    perVideo != null -> runCatching { Browsers.list(perVideo.uri) }.getOrDefault(emptyList()).let { files ->
+                        MediaFiles.folderSidecars(files.filter { !it.isDirectory }.map { it.name }).forEach { sidecars += PlayerSession.sidecarConfig(Browsers.child(perVideo.uri, it.fileName), it) }
+                    }
+                    // Loose files in Subs/ only make sense for a single film in the folder.
+                    videos.size == 1 -> MediaFiles.folderSidecars(subsEntries.filter { !it.isDirectory }.map { it.name })
+                        .forEach { sidecars += PlayerSession.sidecarConfig(Browsers.child(subsUri, it.fileName), it) }
+                    // Several videos: Subs/ files named after the video work like ones beside it.
+                    else -> MediaFiles.findSidecars(video.name, subsEntries.filter { !it.isDirectory }.map { it.name })
+                        .forEach { sidecars += PlayerSession.sidecarConfig(Browsers.child(subsUri, it.fileName), it) }
+                }
             }
             toPlayItem(video, folder, sidecars)
         }
