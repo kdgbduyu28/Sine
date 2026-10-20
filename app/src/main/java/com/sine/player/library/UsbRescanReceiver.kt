@@ -3,7 +3,6 @@ package com.sine.player.library
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.media3.common.util.UnstableApi
 import com.sine.player.SineApp
 import kotlinx.coroutines.launch
@@ -31,7 +30,9 @@ class UsbRescanReceiver : BroadcastReceiver() {
         fun affects(mountPath: String, rootUris: List<String>): Boolean {
             val mount = mountPath.trimEnd('/') + "/"
             return rootUris.any { uri ->
-                val path = if (uri.startsWith("file:")) Uri.decode(uri.removePrefix("file://")) else return@any false
+                if (!uri.startsWith("file:")) return@any false
+                // URLDecoder rather than Uri.decode so this also runs in unit tests ("+" kept as is).
+                val path = java.net.URLDecoder.decode(uri.removePrefix("file://").replace("+", "%2B"), "UTF-8")
                 (path.trimEnd('/') + "/").startsWith(mount)
             }
         }
