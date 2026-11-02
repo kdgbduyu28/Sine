@@ -244,7 +244,13 @@ class AppSettings(context: Context) {
         else -> default
     }
 
+    /** The audio language to ask for: null for no preference and for "original" (worked out per title). */
+    val audioLanguageCode: String? get() = audioLanguage.takeIf { it.isNotEmpty() && it != ORIGINAL_LANGUAGE }
+
     companion object {
+        /** Audio language setting: whatever the film or show was made in (TMDB's original language). */
+        const val ORIGINAL_LANGUAGE = "orig"
+
         /** Language choices offered for audio and subtitle preferences ("" = no preference). */
         val languages = listOf(
             "" to "No preference",

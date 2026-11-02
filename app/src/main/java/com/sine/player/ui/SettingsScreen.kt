@@ -220,9 +220,14 @@ fun SettingsScreen(
                 )
             }
             item {
-                SettingRow("Preferred audio language", "Picked automatically when a file has several", language(s.audioLanguage), {
-                    s.audioLanguage = nextLanguage(s.audioLanguage)
-                })
+                // Audio also offers "Original language", taken from TMDB for library titles.
+                val audioChoices = listOf(AppSettings.ORIGINAL_LANGUAGE to "Original language") + AppSettings.languages
+                SettingRow(
+                    "Preferred audio language",
+                    "Picked automatically when a file has several. Original language uses TMDB for library titles, else the file's default track.",
+                    audioChoices.firstOrNull { it.first == s.audioLanguage }?.second ?: s.audioLanguage,
+                    { s.audioLanguage = next(audioChoices.map { it.first }, s.audioLanguage) },
+                )
             }
             item {
                 SettingRow(

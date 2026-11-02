@@ -97,6 +97,8 @@ data class Meta(
     val nextEpisode: UpcomingEpisode? = null,
     /** False for details saved before the next episode was kept; those shows get looked up again. */
     val nextEpisodeKnown: Boolean = true,
+    /** ISO 639-1 language the title was made in ("ja", "ko", "en"). */
+    val originalLanguage: String? = null,
 )
 
 /** The library index: roots, what the last scan found, and cached metadata. Saved as JSON. */
@@ -220,6 +222,7 @@ class LibraryStore(private val file: File) {
             .put("poster", m.poster ?: "").put("backdrop", m.backdrop ?: "").put("rating", m.rating ?: 0.0)
             .put("genres", JSONArray(m.genres)).put("year", m.year ?: 0).put("at", m.fetchedAt)
             .put("cert", m.certification ?: "")
+            .put("olang", m.originalLanguage ?: "")
             .put("next", m.nextEpisode?.let { JSONObject().put("s", it.season).put("e", it.number).put("date", it.airDate).put("name", it.name ?: "") } ?: JSONObject())
             .put("collection", m.collection?.let { JSONObject().put("id", it.id).put("name", it.name).put("poster", it.poster ?: "").put("backdrop", it.backdrop ?: "") } ?: JSONObject())
             .put("episodes", JSONObject().apply { m.episodes.forEach { (k, e) -> put(k, JSONObject().put("name", e.name ?: "").put("overview", e.overview ?: "").put("still", e.still ?: "").put("aired", e.aired ?: "")) } })
@@ -253,6 +256,7 @@ class LibraryStore(private val file: File) {
                 certification = o.optString("cert").ifEmpty { null },
                 certificationKnown = o.has("cert"),
                 nextEpisodeKnown = o.has("next"),
+                originalLanguage = o.optString("olang").ifEmpty { null },
                 nextEpisode = o.optJSONObject("next")?.takeIf { it.optString("date").length == 10 }?.let {
                     UpcomingEpisode(it.optInt("s"), it.optInt("e"), it.getString("date"), it.optString("name").ifEmpty { null })
                 },

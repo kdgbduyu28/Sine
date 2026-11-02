@@ -112,7 +112,7 @@ object PlayerFactory {
         dolbyVisionBaseLayer = dolbyVisionBaseLayer,
         dolbyVisionProfile7To81 = !dolbyVisionBaseLayer && settings.dolbyVisionMode == com.sine.player.data.DolbyVisionMode.AUTO &&
             settings.dolbyVisionConvertProfile7 && DolbyVisionP7.deviceNeedsConversion,
-        audioLanguage = settings.audioLanguage.ifEmpty { null },
+        audioLanguage = settings.audioLanguageCode,
         subtitleLanguage = settings.subtitleLanguage.ifEmpty { null },
         seekStepMs = settings.seekStepSeconds * 1000L,
         mpvDirectOutput = settings.mpvOutput == com.sine.player.data.MpvOutput.DIRECT,

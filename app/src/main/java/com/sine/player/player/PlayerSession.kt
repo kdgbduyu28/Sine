@@ -693,7 +693,7 @@ class PlayerSession(
 
     /** The language the viewer reads: subtitle language, else audio language, else the TV's. */
     private fun myLanguage(): String =
-        settings.subtitleLanguage.ifEmpty { settings.audioLanguage }.ifEmpty { java.util.Locale.getDefault().language }
+        settings.subtitleLanguage.ifEmpty { settings.audioLanguageCode.orEmpty() }.ifEmpty { java.util.Locale.getDefault().language }
 
     /** Turns subtitles on or off by Settings → Subtitles → mode, without remembering it as the viewer's choice. */
     private fun pickSubtitles(audioLanguage: String?) {
@@ -734,7 +734,12 @@ class PlayerSession(
         }
         val defaultIndex = formats.indexOfFirst { it.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0 }.takeIf { it >= 0 }
             ?: options.indexOfFirst { it.selected }
-        val best = AudioRank.best(candidates, settings.audioLanguage.ifEmpty { null }, defaultIndex) ?: return currentAudioLanguage()
+        val preferred = if (settings.audioLanguage == com.sine.player.data.AppSettings.ORIGINAL_LANGUAGE) {
+            current?.uri?.let { com.sine.player.library.Library.originalLanguageFor(it) }
+        } else {
+            settings.audioLanguageCode
+        }
+        val best = AudioRank.best(candidates, preferred, defaultIndex) ?: return currentAudioLanguage()
         if (options[best].selected) return formats[best].language
         restoring = true
         try {

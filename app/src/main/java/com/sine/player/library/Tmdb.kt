@@ -109,6 +109,7 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
             genres = (0 until genres.length()).mapNotNull { genres.optJSONObject(it)?.optString("name") },
             year = o.optString(dateField).take(4).toIntOrNull(),
             collection = collection(o),
+            originalLanguage = o.optString("original_language").takeIf { it.length in 2..3 },
         )
     }
 

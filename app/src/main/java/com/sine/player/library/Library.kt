@@ -172,6 +172,13 @@ object Library {
         return null
     }
 
+    /** TMDB's original language (ISO 639-1) of the movie or show a file belongs to. */
+    fun originalLanguageFor(uri: String): String? {
+        store.movies.firstOrNull { it.file.uri == uri }?.let { return store.meta[it.key]?.originalLanguage }
+        store.shows.firstOrNull { uri == it.folder || uri.startsWith(it.folder.trimEnd('/') + "/") }?.let { return store.meta[it.key]?.originalLanguage }
+        return null
+    }
+
     /** Collections with at least two of the profile's movies, by name; movies in release order. */
     fun collections(): List<Pair<MovieCollection, List<Movie>>> {
         val profile = SineApp.instance.profiles.active
