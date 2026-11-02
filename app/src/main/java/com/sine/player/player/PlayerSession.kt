@@ -128,6 +128,16 @@ class PlayerSession(
         private set
     var baseLayerOnly by mutableStateOf(settings.dolbyVisionMode == DolbyVisionMode.BASE_LAYER)
         private set
+    /** The playing Dolby Vision profile 7 track is being converted to 8.1 for this TV's decoder. */
+    var dolbyVisionConverted by mutableStateOf(false)
+        private set
+
+    /** HDR label for the playing video, saying when Dolby Vision is converted or reduced to its base layer. */
+    fun dynamicRangeLabel(video: Format): String = when {
+        dolbyVisionConverted -> "Dolby Vision P7 → 8.1"
+        baseLayerOnly && MediaInfo.isDolbyVision(video) -> MediaInfo.hdrLabel(video) + " (base layer)"
+        else -> MediaInfo.hdrLabel(video)
+    }
     var displayMode by mutableStateOf<String?>(null)
 
     var aspect by mutableStateOf(settings.defaultAspect)
@@ -423,7 +433,9 @@ class PlayerSession(
         // A new engine starts with default track selection; re-apply this file's choices.
         restoredFor = null
         resetEngineInfo()
-        val options = PlayerFactory.options(settings, baseLayerOnly).let { if (toneMapping && kind == EngineKind.MPV) ToneMap.apply(it) else it }
+        val options = PlayerFactory.options(settings, baseLayerOnly)
+            .copy(onProfile7Converted = { mainHandler.post { dolbyVisionConverted = true } })
+            .let { if (toneMapping && kind == EngineKind.MPV) ToneMap.apply(it) else it }
         val built = host.createEngine(kind, options, { subtitleDelayMs * 1000 }, { totalAudioDelayMs * 1000 })
         val p = built.player
         p.addListener(listener)
@@ -448,6 +460,7 @@ class PlayerSession(
         audioOutput = null
         droppedFrames = 0
         tracks = Tracks.EMPTY
+        dolbyVisionConverted = false
     }
 
     /** Rebuilds playback on the other engine at the current position (the Picture/Info panel action). */

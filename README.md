@@ -5,7 +5,7 @@ A video player for Android TV / Google TV / Fire TV that aims to replace switchi
 ## Phase 1
 
 - **Engine:** Media3 (ExoPlayer) on the TV's hardware decoders, plus Jellyfin's FFmpeg build for audio the TV can't decode (TrueHD, DTS, …).
-- **Dolby Vision:** plays natively where the chip supports the profile. Otherwise it switches to the HDR10 base layer automatically (profiles 7 and 8). Profile 5 has no base layer, so on those devices it shows a notice. A setting can force the base layer.
+- **Dolby Vision:** plays natively where the chip supports the profile. Profile 7 (UHD Blu-ray remuxes) on a TV that only decodes profile 8 is converted to 8.1 while playing, like Kodi and dovi_tool do: the enhancement layer is dropped and each frame's metadata rewritten, so the TV keeps scene-by-scene Dolby Vision (single-track MKV/MP4; Settings → Dolby Vision profile 7 can turn it off). Without a usable decoder it switches to the HDR10 base layer automatically (profiles 7 and 8). Profile 5 has no base layer, so on those devices it shows a notice. A setting can force the base layer.
 - **Audio passthrough:** sends Dolby Digital, DD+ Atmos, TrueHD, DTS and DTS-HD bitstreams to the AVR or soundbar when the HDMI chain accepts them, and decodes to PCM when it doesn't. A setting forces decoding.
 - **Subtitles:** embedded PGS, VobSub, SRT, ASS and WebVTT; sidecar files (`Movie.en.forced.srt`, …) found automatically; delay ±, size, position and background box.
 - **Refresh-rate matching:** switches the TV to 23.976/24/25/50/59.94 Hz for the video and pauses while HDMI re-syncs.
@@ -191,7 +191,7 @@ The bundled FFmpeg and libmpv are GPL/LGPL, so a distributed build of Sine has t
 
 1. ~~Media3 + FFmpeg audio, DV fallback, passthrough, subtitles, frame-rate matching, local/USB/SMB, resume.~~ Done.
 2. ~~libmpv fallback engine; Jellyfin/Plex/Emby, WebDAV, NFS, SFTP and DLNA browsing; OpenSubtitles search.~~ Done.
-3. ~~Library with posters, home-screen rows, watched sync with Trakt.~~ Done, except DV profile 7 → 8.1 conversion.
+3. ~~Library with posters, home-screen rows, watched sync with Trakt.~~ Done. DV profile 7 → 8.1 conversion written, not compiled yet.
 4. ~~Playback extras: skip intro/credits, chapters, seek thumbnails, audio delay, night mode, Blu-ray/DVD ISO.~~ Written.
 5. ~~Phone and living room: "play to" Sine, voice search, picture-in-picture, settings backup.~~ Written.
 6. ~~Release polish: per-device APKs, signing, GitHub Releases, update checks, log export.~~ Written.

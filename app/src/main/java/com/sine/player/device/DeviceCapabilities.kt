@@ -91,6 +91,11 @@ object DeviceCapabilities {
             !name.startsWith("omx.google.") && !name.startsWith("c2.android.") && !name.contains("ffmpeg")
         }
 
+    /** Dolby Vision profiles any decoder on this device reports. */
+    fun dolbyVisionProfiles(): Set<Int> = decodersFor(MimeTypes.VIDEO_DOLBY_VISION).flatMap { info ->
+        info.getCapabilitiesForType(MimeTypes.VIDEO_DOLBY_VISION).profileLevels.map { dolbyVisionProfileNumber(it.profile) }
+    }.toSet()
+
     private fun dolbyVision(): CapabilitySection {
         val dv = decodersFor(MimeTypes.VIDEO_DOLBY_VISION)
         if (dv.isEmpty()) {
@@ -101,16 +106,20 @@ object DeviceCapabilities {
                 ),
             )
         }
-        val profiles = dv.flatMap { info ->
-            info.getCapabilitiesForType(MimeTypes.VIDEO_DOLBY_VISION).profileLevels.map { dolbyVisionProfileNumber(it.profile) }
-        }.distinct().sorted()
+        val profiles = dolbyVisionProfiles().sorted()
         return CapabilitySection(
             "Dolby Vision",
             buildList {
                 add("Decoders" to dv.joinToString(", ") { it.name })
                 add("Profiles" to profiles.joinToString(", ") { "P$it" })
                 add("Profile 5 (streaming, WEB-DL)" to if (5 in profiles) "Yes" else "No")
-                add("Profile 7 (UHD Blu-ray remux)" to if (7 in profiles) "Yes" else "No: plays the HDR10 base layer")
+                add(
+                    "Profile 7 (UHD Blu-ray remux)" to when {
+                        7 in profiles -> "Yes"
+                        8 in profiles -> "Converted to 8.1 (Settings → Dolby Vision profile 7)"
+                        else -> "No: plays the HDR10 base layer"
+                    },
+                )
                 add("Profile 8 (HDR10-compatible)" to if (8 in profiles) "Yes" else "No: plays the HDR10 base layer")
             },
         )

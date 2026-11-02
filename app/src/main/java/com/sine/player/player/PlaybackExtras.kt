@@ -316,6 +316,7 @@ internal fun LazyListScope.sleepRows(session: PlayerSession, onDone: () -> Unit)
 internal fun StartCard(session: PlayerSession, modifier: Modifier) {
     val item = session.current ?: return
     val badges = MediaInfo.startBadges(session.videoFormat, session.audioFormat, session.audioOutput)
+        .map { if (session.dolbyVisionConverted && it.startsWith("Dolby Vision")) "Dolby Vision P7 → 8.1" else it }
     Column(
         modifier
             .padding(start = 56.dp, top = 48.dp)

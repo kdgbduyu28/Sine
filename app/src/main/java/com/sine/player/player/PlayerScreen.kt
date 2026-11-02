@@ -845,7 +845,11 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 item {
                     InfoRow(
                         "Dolby Vision",
-                        if (session.baseLayerOnly) "Playing the HDR10 base layer" else "Decoding Dolby Vision",
+                        when {
+                            session.baseLayerOnly -> "Playing the HDR10 base layer"
+                            session.dolbyVisionConverted -> "Converting profile 7 to 8.1 (no enhancement layer)"
+                            else -> "Decoding Dolby Vision"
+                        },
                     )
                 }
             }
@@ -869,7 +873,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                 add("Engine" to (session.engineKind?.label ?: "—"))
                 video?.let { v ->
                     add("Video" to listOfNotNull(MediaInfo.videoCodec(v), "${v.width}×${v.height}", MediaInfo.frameRate(v.frameRate)).joinToString(" · "))
-                    add("Dynamic range" to MediaInfo.hdrLabel(v) + if (session.baseLayerOnly && MediaInfo.isDolbyVision(v)) " (base layer)" else "")
+                    add("Dynamic range" to session.dynamicRangeLabel(v))
                     if (v.bitrate > 0) add("Video bitrate" to "${v.bitrate / 1_000_000} Mbps")
                     v.codecs?.let { add("Codec string" to it) }
                 }

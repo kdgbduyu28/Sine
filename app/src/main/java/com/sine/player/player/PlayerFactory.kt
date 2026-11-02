@@ -39,6 +39,10 @@ data class EngineOptions(
     val nightMode: Boolean = false,
     val dialogueBoost: Boolean = false,
     val buffer: BufferPlan = BufferPlan.DEFAULT,
+    /** Media3 only: rewrite Dolby Vision profile 7 as 8.1 while extracting ([DolbyVisionP7]). */
+    val dolbyVisionProfile7To81: Boolean = false,
+    /** Called (on the loading thread) when a profile 7 track starts being converted. */
+    val onProfile7Converted: () -> Unit = {},
 )
 
 @UnstableApi
@@ -82,7 +86,12 @@ object PlayerFactory {
         return ExoPlayer.Builder(context, renderers)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(SchemeDataSource.Factory(context), extractors))
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(
+                    SchemeDataSource.Factory(context),
+                    if (options.dolbyVisionProfile7To81) DolbyVisionP7ExtractorsFactory(extractors, options.onProfile7Converted) else extractors,
+                ),
+            )
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
                 true,
@@ -101,6 +110,8 @@ object PlayerFactory {
         buffer = Buffers.forDevice(com.sine.player.SineApp.instance, settings.bufferSize),
         tunneling = settings.tunneling,
         dolbyVisionBaseLayer = dolbyVisionBaseLayer,
+        dolbyVisionProfile7To81 = !dolbyVisionBaseLayer && settings.dolbyVisionMode == com.sine.player.data.DolbyVisionMode.AUTO &&
+            settings.dolbyVisionConvertProfile7 && DolbyVisionP7.deviceNeedsConversion,
         audioLanguage = settings.audioLanguage.ifEmpty { null },
         subtitleLanguage = settings.subtitleLanguage.ifEmpty { null },
         seekStepMs = settings.seekStepSeconds * 1000L,

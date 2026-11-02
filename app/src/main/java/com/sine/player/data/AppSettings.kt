@@ -82,6 +82,8 @@ class AppSettings(context: Context) {
     var tunneling by pref("tunneling", false)
     var frameRateMatching by pref("frame_rate_matching", true)
     var dolbyVisionMode by enumPref("dv_mode", DolbyVisionMode.AUTO)
+    /** Profile 7 on a decoder that only knows profile 8: convert to 8.1 rather than play the base layer. */
+    var dolbyVisionConvertProfile7 by pref("dv_p7_to_81", true)
     var resumeMode by enumPref("resume_mode", ResumeMode.ASK)
     var defaultAspect by enumPref("aspect", AspectMode.FIT)
     var audioLanguage by pref("audio_language", "")

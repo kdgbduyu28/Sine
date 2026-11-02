@@ -43,7 +43,7 @@ internal fun StatsOverlay(session: PlayerSession, modifier: Modifier) {
         add("Engine     ${session.engineKind?.label ?: "—"}")
         video?.let { v ->
             add("Video      ${MediaInfo.videoCodec(v)} ${v.width}×${v.height} ${MediaInfo.frameRate(v.frameRate) ?: ""}".trimEnd())
-            add("Range      ${MediaInfo.hdrLabel(v)}${if (session.baseLayerOnly && MediaInfo.isDolbyVision(v)) " (base layer)" else ""}")
+            add("Range      ${session.dynamicRangeLabel(v)}")
         }
         add("Decoder    ${session.videoDecoder ?: "—"}")
         audio?.let { add("Audio      ${MediaInfo.audioLabel(it)}") }

@@ -86,6 +86,14 @@ fun SettingsScreen(
             }
             item {
                 SettingRow(
+                    "Dolby Vision profile 7",
+                    "UHD Blu-ray remuxes on a TV that only decodes profile 8: convert them to 8.1 while playing (keeps Dolby Vision, drops the enhancement layer), or play the HDR10 base layer.",
+                    if (s.dolbyVisionConvertProfile7) "Convert to 8.1" else "HDR10 base layer",
+                    { s.dolbyVisionConvertProfile7 = !s.dolbyVisionConvertProfile7 },
+                )
+            }
+            item {
+                SettingRow(
                     "Tunneled playback",
                     "Hands video and audio timing to the TV's hardware. Can fix lip-sync on some boxes; leave off unless you need it.",
                     onOff(s.tunneling),
