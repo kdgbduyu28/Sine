@@ -588,6 +588,10 @@ class MpvPlayer(
         true
     }.getOrDefault(false)
 
+    fun frameStep(forward: Boolean) {
+        runCatching { mpv?.command(arrayOf(if (forward) "frame-step" else "frame-back-step")) }
+    }
+
     fun setStretch(stretch: Boolean) {
         mpv?.setPropertyString("keepaspect", if (stretch) "no" else "yes")
     }
@@ -689,6 +693,11 @@ class MpvEngine(private val mpv: MpvPlayer, private val resolve: (String) -> Str
     }
 
     override fun screenshot(path: String): Boolean = mpv.screenshot(path)
+
+    override fun frameStep(forward: Boolean): Boolean {
+        mpv.frameStep(forward)
+        return true
+    }
 
     override fun addSubtitle(uri: String, label: String, language: String?): Boolean {
         mpv.addSubtitle(resolve(uri), label, language)

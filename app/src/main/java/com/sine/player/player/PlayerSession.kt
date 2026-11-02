@@ -860,7 +860,29 @@ class PlayerSession(
             setSleepTimer(SleepTimer.cycle(sleepChoice))
             null
         }
+        com.sine.player.data.RemoteAction.FRAME_FORWARD -> frameStep(true)
+        com.sine.player.data.RemoteAction.FRAME_BACK -> frameStep(false)
         com.sine.player.data.RemoteAction.FIND_SUBTITLES, com.sine.player.data.RemoteAction.INFO -> null
+    }
+
+    /**
+     * One frame forward or back, paused. mpv steps itself; Media3 seeks exactly by one frame
+     * duration (backwards decodes from the previous keyframe, so it can take a moment).
+     */
+    private fun frameStep(forward: Boolean): String? {
+        val p = player ?: return null
+        pause()
+        if (engine?.frameStep(forward) == true) return null
+        val fps = videoFormat?.frameRate?.takeIf { it > 1f } ?: 24f
+        val frameUs = (1_000_000 / fps).toLong()
+        // Count in whole frames from the current one, and land in the middle of the target frame
+        // so millisecond rounding can't miss it or skip one on the next press.
+        val frame = p.currentPosition * 1000 / frameUs
+        val targetUs = (frame + if (forward) 1 else -1).coerceAtLeast(0) * frameUs + frameUs / 2
+        val target = (targetUs / 1000).coerceIn(0, (durationMs - 1).coerceAtLeast(0))
+        (p as? ExoPlayer)?.setSeekParameters(androidx.media3.exoplayer.SeekParameters.EXACT)
+        seekTo(target)
+        return String.format(java.util.Locale.US, "%s %s.%03d", if (forward) "▶" else "◀", com.sine.player.util.Time.format(target), target % 1000)
     }
 
     val subtitlesOff: Boolean

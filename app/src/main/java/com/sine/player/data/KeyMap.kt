@@ -30,6 +30,8 @@ enum class RemoteAction(val label: String) {
     SKIP_SEGMENT("Skip intro / credits"),
     SCREENSHOT("Screenshot"),
     SLEEP_TIMER("Sleep timer (cycle)"),
+    FRAME_FORWARD("Next frame (pauses)"),
+    FRAME_BACK("Previous frame (pauses)"),
 }
 
 /**
@@ -90,6 +92,8 @@ class KeyMap(context: Context) {
             KeyEvent.KEYCODE_PROG_BLUE to RemoteAction.TOGGLE_STATS,
             KeyEvent.KEYCODE_CHANNEL_UP to RemoteAction.NEXT,
             KeyEvent.KEYCODE_CHANNEL_DOWN to RemoteAction.PREVIOUS,
+            KeyEvent.KEYCODE_MEDIA_STEP_FORWARD to RemoteAction.FRAME_FORWARD,
+            KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD to RemoteAction.FRAME_BACK,
         )
 
         /** Keys the player already uses (D-pad, back, media keys); they can't be reassigned. */

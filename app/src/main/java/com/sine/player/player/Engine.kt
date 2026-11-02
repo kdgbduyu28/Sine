@@ -59,6 +59,9 @@ interface Engine {
     /** Saves the current video frame; null when the engine can't (Media3 uses PixelCopy instead). */
     fun screenshot(path: String): Boolean = false
 
+    /** Shows the next or previous frame and stays paused; false when the session should seek instead. */
+    fun frameStep(forward: Boolean): Boolean = false
+
     /** 100–200 %; louder than the file for quiet recordings. */
     fun setVolumeBoost(percent: Int) = Unit
 
