@@ -80,6 +80,14 @@ fun SettingsScreen(
                 )
             }
             item {
+                SettingRow(
+                    "Match resolution",
+                    "Also switch the TV to the video's resolution (1080p, 720p) so the TV's own scaler upscales it. Switching takes a little longer.",
+                    onOff(s.matchResolution),
+                    { s.matchResolution = !s.matchResolution },
+                )
+            }
+            item {
                 SettingRow("Dolby Vision", s.dolbyVisionMode.description, s.dolbyVisionMode.label, {
                     s.dolbyVisionMode = next(DolbyVisionMode.entries, s.dolbyVisionMode)
                 })

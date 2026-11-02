@@ -81,6 +81,8 @@ class AppSettings(context: Context) {
     var passthrough by pref("passthrough", true)
     var tunneling by pref("tunneling", false)
     var frameRateMatching by pref("frame_rate_matching", true)
+    /** Also switch the output resolution to the video's (720p/1080p/4K) and let the TV upscale. */
+    var matchResolution by pref("match_resolution", false)
     var dolbyVisionMode by enumPref("dv_mode", DolbyVisionMode.AUTO)
     /** Profile 7 on a decoder that only knows profile 8: convert to 8.1 rather than play the base layer. */
     var dolbyVisionConvertProfile7 by pref("dv_p7_to_81", true)

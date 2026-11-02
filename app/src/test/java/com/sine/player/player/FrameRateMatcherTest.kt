@@ -48,4 +48,32 @@ class FrameRateMatcherTest {
     fun `never changes resolution`() {
         assertNull(FrameRateMatcher.pick(listOf(uhd60, fhd23976), uhd60, 23.976f))
     }
+
+    private val fhd60 = DisplayModeSpec(7, 1920, 1080, 60f)
+    private val hd60 = DisplayModeSpec(8, 1280, 720, 60f)
+    private val withSizes = all + listOf(fhd60, hd60)
+
+    @Test
+    fun `resolution matching picks the smallest size that holds the video`() {
+        assertEquals(1920 to 1080, FrameRateMatcher.targetSize(withSizes, 1920, 800))
+        assertEquals(1280 to 720, FrameRateMatcher.targetSize(withSizes, 1280, 536))
+        assertEquals(1920 to 1080, FrameRateMatcher.targetSize(withSizes, 1920, 1088))
+        assertEquals(3840 to 2160, FrameRateMatcher.targetSize(withSizes, 3840, 1600))
+        assertEquals(1280 to 720, FrameRateMatcher.targetSize(withSizes, 720, 480))
+    }
+
+    @Test
+    fun `1080p film on a 4K60 output goes to 1080p at 23_976`() {
+        assertEquals(fhd23976, FrameRateMatcher.pick(withSizes, uhd60, 23.976f, 1920, 1080))
+    }
+
+    @Test
+    fun `resolution only keeps the refresh rate`() {
+        assertEquals(fhd60, FrameRateMatcher.pick(withSizes, uhd60, 23.976f, 1920, 1080, matchRate = false))
+    }
+
+    @Test
+    fun `4K video on a 4K output only matches the rate`() {
+        assertEquals(uhd23976, FrameRateMatcher.pick(withSizes, uhd60, 23.976f, 3840, 2160))
+    }
 }

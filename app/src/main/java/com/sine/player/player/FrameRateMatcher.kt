@@ -27,17 +27,46 @@ object FrameRateMatcher {
 
     /**
      * Returns the mode to switch to, or null when the current mode already suits [fps] or nothing
-     * better exists. Only modes with the current resolution are considered so the TV doesn't
-     * also switch resolution (which takes longer and some sets handle badly).
+     * better exists. Normally only modes with the current resolution are considered so the TV
+     * doesn't also switch resolution (which takes longer and some sets handle badly). With
+     * [videoWidth]/[videoHeight] the output also moves to the smallest resolution (720p and up)
+     * that holds the video, so the TV's own scaler does the upscaling. [matchRate] false keeps
+     * the refresh rate as close to the current one as the new resolution allows.
      */
-    fun pick(modes: List<DisplayModeSpec>, current: DisplayModeSpec, fps: Float): DisplayModeSpec? {
-        if (fps <= 1f) return null
-        val sameSize = modes.filter { it.width == current.width && it.height == current.height }
-        val best = sameSize.mapNotNull { fit(it, fps) }
-            .sortedWith(compareBy<Fit>({ !it.exact }, { it.multiple }, { it.error }))
-            .firstOrNull() ?: return null
+    fun pick(
+        modes: List<DisplayModeSpec>,
+        current: DisplayModeSpec,
+        fps: Float,
+        videoWidth: Int = 0,
+        videoHeight: Int = 0,
+        matchRate: Boolean = true,
+    ): DisplayModeSpec? {
+        val size = targetSize(modes, videoWidth, videoHeight) ?: (current.width to current.height)
+        val sameSize = modes.filter { it.width == size.first && it.height == size.second }
+        val best = if (matchRate && fps > 1f) {
+            sameSize.mapNotNull { fit(it, fps) }
+                .sortedWith(compareBy<Fit>({ !it.exact }, { it.multiple }, { it.error }))
+                .firstOrNull()
+        } else {
+            null
+        }
+        if (size != current.width to current.height) {
+            // Changing resolution anyway: the best rate there, else the one nearest today's.
+            return best?.mode ?: sameSize.minByOrNull { abs(it.refreshRate - current.refreshRate) }
+        }
+        if (best == null) return null
         val now = fit(current, fps)
         if (now != null && (now.exact || !best.exact) && now.multiple <= best.multiple) return null
         return best.mode.takeIf { it.id != current.id }
+    }
+
+    /** Smallest output size from 720p up that holds a [width]×[height] video, else the largest; null without a video size. */
+    fun targetSize(modes: List<DisplayModeSpec>, width: Int, height: Int): Pair<Int, Int>? {
+        if (width <= 0 || height <= 0) return null
+        val sizes = modes.filter { it.height >= 720 }.map { it.width to it.height }.distinct()
+            .sortedWith(compareBy({ it.first * it.second }, { it.second }))
+        if (sizes.isEmpty()) return null
+        // A little slack for 1920×1088 encodes and the like.
+        return sizes.firstOrNull { it.first * 102 >= width * 100 && it.second * 102 >= height * 100 } ?: sizes.last()
     }
 }

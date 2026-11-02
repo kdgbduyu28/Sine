@@ -78,7 +78,8 @@ class PlayerSession(
 
         /** Tracks are known for a new item: the host looks up chapters and skippable segments. */
         fun onItemReady(item: PlayItem) = Unit
-        fun onFrameRate(fps: Float)
+        /** A video started: match the TV's refresh rate (and resolution, when [width]/[height] are given). */
+        fun onFrameRate(fps: Float, width: Int = 0, height: Int = 0, matchRate: Boolean = true)
         fun onFinished(ended: Boolean)
         fun onProgress(item: PlayItem, positionMs: Long, durationMs: Long, state: ProgressState) = Unit
 
@@ -1001,9 +1002,15 @@ class PlayerSession(
                 if (videoFormat == null) videoFormat = format
                 if (engineKind == EngineKind.MEDIA3) maybeFallBackToBaseLayer(format, video!!.getTrackSupport(videoIndex!!))
                 val uri = current?.uri
-                if (settings.frameRateMatching && uri != null && frameRateHandledFor != uri && format.frameRate > 0) {
+                val matchRate = settings.frameRateMatching && format.frameRate > 0
+                val matchSize = settings.matchResolution && format.width > 0 && format.height > 0
+                if ((matchRate || matchSize) && uri != null && frameRateHandledFor != uri) {
                     frameRateHandledFor = uri
-                    host.onFrameRate(format.frameRate)
+                    if (matchSize) {
+                        host.onFrameRate(format.frameRate, format.width, format.height, matchRate)
+                    } else {
+                        host.onFrameRate(format.frameRate)
+                    }
                 }
             }
             val audio = newTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }

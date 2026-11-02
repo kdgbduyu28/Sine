@@ -323,15 +323,20 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     // region Refresh-rate matching
 
-    override fun onFrameRate(fps: Float) {
+    override fun onFrameRate(fps: Float, width: Int, height: Int, matchRate: Boolean) {
         val display = currentDisplay() ?: return
         val modes = display.supportedModes.map { DisplayModeSpec(it.modeId, it.physicalWidth, it.physicalHeight, it.refreshRate) }
         val now = display.mode.let { DisplayModeSpec(it.modeId, it.physicalWidth, it.physicalHeight, it.refreshRate) }
-        val target = FrameRateMatcher.pick(modes, now, fps) ?: return
+        val target = FrameRateMatcher.pick(modes, now, fps, width, height, matchRate) ?: return
+        if (target.id == now.id) return
 
         // The TV blanks for a second or two while HDMI re-syncs; hold playback until it's back.
         session.hold(PlayerSession.HOLD_DISPLAY)
-        session.notice = String.format(Locale.US, "Switching display to %.3f Hz", target.refreshRate)
+        session.notice = if (target.width != now.width || target.height != now.height) {
+            String.format(Locale.US, "Switching display to %d×%d @ %.3f Hz", target.width, target.height, target.refreshRate)
+        } else {
+            String.format(Locale.US, "Switching display to %.3f Hz", target.refreshRate)
+        }
         pendingModeId = target.id
         val manager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val listener = object : DisplayManager.DisplayListener {
