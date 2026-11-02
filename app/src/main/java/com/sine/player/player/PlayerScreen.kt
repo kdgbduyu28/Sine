@@ -362,6 +362,7 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
     val edge = settings.subtitleEdge
     val aspect = session.aspect
     val inBars = settings.subtitlesInBars
+    val video = session.videoFormat
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
@@ -387,7 +388,11 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
                 AspectMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             }
             session.surfaceView = view.videoSurfaceView as? android.view.SurfaceView
-            view.subtitleView?.let { placeSubtitles(view, it, inBars) }
+            // Only for letterboxed video: on 4:3 (pillarboxed) DVD subtitles would be stretched sideways.
+            val screenAspect = if (view.width > 0 && view.height > 0) view.width.toFloat() / view.height else 16f / 9f
+            val letterboxed = video != null && video.width > 0 && video.height > 0 &&
+                video.width * video.pixelWidthHeightRatio / video.height > screenAspect + 0.02f
+            view.subtitleView?.let { placeSubtitles(view, it, inBars && letterboxed && aspect == AspectMode.FIT) }
             view.subtitleView?.apply {
                 setApplyEmbeddedStyles(true)
                 setApplyEmbeddedFontSizes(false)
