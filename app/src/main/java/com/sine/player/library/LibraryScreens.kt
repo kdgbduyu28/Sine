@@ -438,7 +438,7 @@ fun ShowDetailScreen(
             }
             val owned = show.episodes.filter { it.season == season }
             val missing = remember(meta, season, owned) {
-                MissingEpisodes.forSeason(meta?.episodes.orEmpty(), season, owned.map { it.number }.toSet(), java.time.LocalDate.now().toString())
+                MissingEpisodes.forSeason(meta?.episodes.orEmpty(), season, owned.map { it.number }.toSet(), com.sine.player.util.Time.today())
             }
             // Owned episodes, with aired ones that aren't in the library slotted in by number.
             val rows: List<Pair<Int, Episode?>> = (owned.map { it.number to it } + missing.map { it.first to null }).sortedBy { it.first }

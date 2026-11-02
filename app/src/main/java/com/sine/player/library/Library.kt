@@ -229,7 +229,10 @@ object Library {
             val missingSeason = show.seasons.any { it !in knownSeasons }
             // Details saved before air dates were kept: fetch once more so missing episodes can show.
             val noAirDates = existing?.episodes?.isNotEmpty() == true && existing.episodes.values.none { it.aired != null }
-            if (!force && existing != null && !missingSeason && !noAirDates && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            // Once the known next episode has aired, look up the one after it (and its details).
+            val nextAired = existing?.nextEpisode?.let { it.airDate < com.sine.player.util.Time.today() } == true ||
+                existing?.nextEpisodeKnown == false
+            if (!force && existing != null && !missingSeason && !noAirDates && !nextAired && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${show.title}"
             runCatching { tmdb.show(show.title, show.year, show.seasons) }.getOrNull()
                 ?.let { store.putMeta(show.key, it) }

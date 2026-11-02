@@ -71,7 +71,10 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
                 }
             }
         }
-        return meta(details, "name", "first_air_date").copy(episodes = episodes, certification = AgeRatings.tvCertification(details, region))
+        val next = details.optJSONObject("next_episode_to_air")?.takeIf { it.optString("air_date").length == 10 }?.let {
+            UpcomingEpisode(it.optInt("season_number"), it.optInt("episode_number"), it.getString("air_date"), it.optString("name").ifEmpty { null })
+        }
+        return meta(details, "name", "first_air_date").copy(episodes = episodes, certification = AgeRatings.tvCertification(details, region), nextEpisode = next)
     }
 
     /** Prefers an exact-year match, then TMDB's own ranking. */

@@ -26,4 +26,16 @@ class MissingEpisodesTest {
         val meta = mapOf("3:1" to ep("2020-01-01"), "3:2" to ep("2020-01-08"))
         assertEquals(emptyList<Int>(), MissingEpisodes.forSeason(meta, 3, setOf(1, 2), "2026-11-02").map { it.first })
     }
+
+    @Test
+    fun `coming up lists future episodes soonest first`() {
+        fun show(key: String) = Show(key = key, title = key, year = null, folder = "smb://nas/$key", localPoster = null, episodes = emptyList(), addedAt = 0L)
+        val shows = listOf(show("a"), show("b"), show("c"))
+        val meta = mapOf(
+            "a" to Meta(null, null, null, null, null, null, emptyList(), null, nextEpisode = UpcomingEpisode(2, 5, "2026-11-09", null)),
+            "b" to Meta(null, null, null, null, null, null, emptyList(), null, nextEpisode = UpcomingEpisode(1, 3, "2026-11-02", null)),
+            "c" to Meta(null, null, null, null, null, null, emptyList(), null, nextEpisode = UpcomingEpisode(4, 1, "2026-10-30", null)),
+        )
+        assertEquals(listOf("b", "a"), ComingUp.list(shows, meta, "2026-11-02").map { it.first.key })
+    }
 }

@@ -55,6 +55,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - **Library screensaver:** "Sine library" in the TV's screensaver settings shows backdrops from your library with title, year, rating and plot, next to the existing "Sine photos".
 - **History:** a home tile listing everything the profile watched or started, by day; OK plays it again, hold OK twice to remove an entry.
 - **Missing episodes:** show pages list episodes TMDB says have aired but that aren't in your library, greyed out between the ones you have.
+- **Coming up:** a home row with the next episode of each show in your library and when it airs (TMDB), soonest first.
 - **My list:** "+ My list" on movie and show pages saves titles to a per-profile home row. On show pages, mark a whole season watched/unwatched, or hold OK on an episode to mark it and everything before it watched.
 - **Versions:** when a movie is in the library more than once (4K remux and 1080p, theatrical and extended), its page lists each as "2160p · Dolby Vision · Remux · 58 GB" and starts with the one you're watching, else the best.
 - **Collections:** films from the same TMDB collection grouped on the home screen and on their own page, in release order (needs two or more in your library).

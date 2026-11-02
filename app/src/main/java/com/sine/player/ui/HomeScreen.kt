@@ -332,6 +332,22 @@ fun HomeScreen(
                     }
                 }
             }
+            val comingUp = com.sine.player.library.ComingUp.list(library.shows.filter { profile.allows(it.folder) }, library.meta, com.sine.player.util.Time.today())
+            if (comingUp.isNotEmpty()) {
+                item { SectionTitle("Coming up") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items(comingUp.take(20), key = { "coming:" + it.first.key }) { (show, next) ->
+                            com.sine.player.library.PosterCard(
+                                library.meta[show.key]?.title ?: show.title,
+                                "S%02dE%02d · %s".format(next.season, next.number, com.sine.player.util.Time.airDay(next.airDate)),
+                                com.sine.player.library.Library.posterFor(show.key, show.localPoster),
+                                onClick = { onShow(show.key) },
+                            )
+                        }
+                    }
+                }
+            }
             val movies = library.movies.filter { profile.allows(it.file.uri) }.distinctBy { it.key }.sortedByDescending { it.addedAt }
             if (movies.isNotEmpty()) {
                 item { SectionTitle("Movies") }

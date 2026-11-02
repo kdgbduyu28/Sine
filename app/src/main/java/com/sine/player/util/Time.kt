@@ -26,6 +26,19 @@ object Time {
         return sign + String.format(Locale.US, "%.2f s", kotlin.math.abs(ms) / 1000.0)
     }
 
+    /** Today's local date as yyyy-MM-dd (java.time needs Android 8; Sine runs on 7). */
+    fun today(now: java.util.Date = java.util.Date()): String = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now)
+
+    /** "Today", "Tomorrow" or "Fri 7 Nov" for a yyyy-MM-dd air date. */
+    fun airDay(date: String, today: String = today()): String {
+        if (date == today) return "Today"
+        val parser = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val day = runCatching { parser.parse(date) }.getOrNull() ?: return date
+        val tomorrow = runCatching { parser.parse(today) }.getOrNull()?.let { java.util.Date(it.time + 36 * 3_600_000L) }
+        if (tomorrow != null && parser.format(tomorrow) == date) return "Tomorrow"
+        return java.text.SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(day)
+    }
+
     /** "2h 05m left", "12m left". */
     fun remaining(ms: Long): String {
         val minutes = (ms.coerceAtLeast(0) + 59_999) / 60_000
