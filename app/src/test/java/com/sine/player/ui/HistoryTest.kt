@@ -22,4 +22,17 @@ class HistoryTest {
         assertEquals(listOf("justNow", "morning"), groups[0].second.map { it.title })
         assertEquals(listOf("lastNight"), groups[1].second.map { it.title })
     }
+
+    @Test
+    fun `week total counts this week's videos up to where they got`() {
+        val now = 1_000L * 86_400_000L
+        val records = listOf(
+            PlaybackRecord("a", "A", null, positionMs = 1_800_000, durationMs = 3_600_000, updatedAt = now - 1_000),
+            PlaybackRecord("b", "B", null, positionMs = 3_500_000, durationMs = 3_600_000, updatedAt = now - 86_400_000L),
+            PlaybackRecord("c", "C", null, positionMs = 3_000_000, durationMs = 3_600_000, updatedAt = now - 8 * 86_400_000L),
+        )
+        assertEquals(1_800_000L + 3_600_000L, History.weekMs(records, now))
+        assertEquals("1h 30m", History.hours(5_400_000))
+        assertEquals("45m", History.hours(2_700_000))
+    }
 }

@@ -50,6 +50,20 @@ object History {
             }
     }
 
+    /**
+     * Roughly how long was watched in the last 7 days: the furthest point reached in each video
+     * touched this week (a rewatch counts once).
+     */
+    fun weekMs(records: List<PlaybackRecord>, now: Long): Long =
+        records.filter { it.updatedAt in (now - 7 * 86_400_000L)..now }
+            .sumOf { r -> if (r.watched && r.durationMs > 0) r.durationMs else r.positionMs.coerceAtMost(r.durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE) }
+
+    /** "12h 30m", "45m". */
+    fun hours(ms: Long): String {
+        val minutes = ms / 60_000
+        return if (minutes >= 60) "${minutes / 60}h ${"%02d".format(minutes % 60)}m" else "${minutes}m"
+    }
+
     private fun dateLabel(ms: Long): String = DateFormat.getDateInstance(DateFormat.FULL).format(Date(ms))
 }
 
@@ -64,7 +78,13 @@ fun HistoryScreen(onPlay: (uri: String, title: String?, folder: String?, positio
     val records = resume.all().filter { profile.allows(it.uri) && it.updatedAt > 0 }
     val groups = History.group(records, System.currentTimeMillis())
 
-    Page("History", if (records.isEmpty()) "Nothing watched yet" else "${records.size} videos · hold OK to remove one") {
+    val week = History.weekMs(records, System.currentTimeMillis())
+    val summary = listOfNotNull(
+        "${records.size} videos",
+        week.takeIf { it >= 60_000 }?.let { "${History.hours(it)} this week" },
+        "hold OK to remove one",
+    ).joinToString(" · ")
+    Page("History", if (records.isEmpty()) "Nothing watched yet" else summary) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             groups.forEach { (day, list) ->
                 item(key = "day:$day") { SectionTitle(day) }
