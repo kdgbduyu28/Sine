@@ -77,6 +77,19 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
         return meta(details, "name", "first_air_date").copy(episodes = episodes, certification = AgeRatings.tvCertification(details, region), nextEpisode = next)
     }
 
+    /** Every film in a TMDB collection, owned or not. */
+    fun collectionParts(id: Int): List<CollectionPart> {
+        val parts = get("/collection/$id").optJSONArray("parts") ?: return emptyList()
+        return (0 until parts.length()).mapNotNull { parts.optJSONObject(it) }.map { p ->
+            CollectionPart(
+                p.optInt("id"),
+                p.optString("title"),
+                p.optString("release_date").takeIf { it.length == 10 },
+                image(p.optString("poster_path"), "w342"),
+            )
+        }
+    }
+
     /** Prefers an exact-year match, then TMDB's own ranking. */
     private fun best(results: JSONArray?, year: Int?, dateField: String): JSONObject? {
         if (results == null || results.length() == 0) return null

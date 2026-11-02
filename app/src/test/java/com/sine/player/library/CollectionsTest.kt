@@ -45,4 +45,15 @@ class CollectionsTest {
         assertTrue(none.collectionKnown)
         assertNull(none.collection)
     }
+
+    @Test
+    fun `collection parts not in the library come in release order`() {
+        val parts = listOf(
+            CollectionPart(3, "Third", "2003-12-17", null),
+            CollectionPart(1, "First", "2001-12-19", null),
+            CollectionPart(9, "Announced", null, null),
+            CollectionPart(2, "Second", "2002-12-18", null),
+        )
+        assertEquals(listOf(3, 9), CollectionPart.missing(parts, setOf(1, 2)).map { it.tmdbId })
+    }
 }

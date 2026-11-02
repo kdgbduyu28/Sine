@@ -62,6 +62,15 @@ object ComingUp {
             .sortedWith(compareBy({ it.second.airDate }, { it.first.title }))
 }
 
+/** One film of a TMDB collection; [released] is yyyy-MM-dd when known. */
+data class CollectionPart(val tmdbId: Int, val title: String, val released: String?, val poster: String?) {
+    companion object {
+        /** Parts that aren't among [owned] TMDB ids, in release order (unknown dates last). */
+        fun missing(parts: List<CollectionPart>, owned: Set<Int>): List<CollectionPart> =
+            parts.filter { it.tmdbId > 0 && it.tmdbId !in owned }.sortedBy { it.released ?: "9999" }
+    }
+}
+
 /** A TMDB movie collection ("The Lord of the Rings Collection"). */
 data class MovieCollection(val id: Int, val name: String, val poster: String?, val backdrop: String?)
 

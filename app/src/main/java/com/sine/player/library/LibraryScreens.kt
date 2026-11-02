@@ -234,6 +234,45 @@ fun CollectionScreen(id: Int, onMovie: (String) -> Unit) {
                     )
                 }
             }
+            MissingFromCollection(id, movies)
+        }
+    }
+}
+
+/** The collection's other films (from TMDB), greyed out: not owned, or not released yet. */
+@Composable
+private fun MissingFromCollection(id: Int, movies: List<Movie>) {
+    val key = SineApp.instance.settings.tmdbApiKey.trim()
+    if (key.isEmpty()) return
+    var parts by remember(id) { mutableStateOf<List<CollectionPart>>(emptyList()) }
+    LaunchedEffect(id, key) {
+        parts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { Tmdb(key).collectionParts(id) }.getOrDefault(emptyList())
+        }
+    }
+    val owned = movies.mapNotNull { Library.store.meta[it.key]?.tmdbId }.toSet()
+    val missing = CollectionPart.missing(parts, owned)
+    if (missing.isEmpty()) return
+    val today = com.sine.player.util.Time.today()
+    Spacer(Modifier.height(28.dp))
+    Text("Not in your library", style = MaterialTheme.typography.titleMedium, color = SineColors.text)
+    Spacer(Modifier.height(8.dp))
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        items(missing, key = { "part:${it.tmdbId}" }) { part ->
+            val released = part.released
+            PosterCard(
+                part.title,
+                when {
+                    released == null -> null
+                    released > today && released.take(4) == today.take(4) -> "Out " + com.sine.player.util.Time.airDay(released, today)
+                    released > today -> "Out in ${released.take(4)}"
+                    else -> released.take(4)
+                },
+                part.poster,
+                onClick = {},
+                modifier = Modifier.alpha(0.5f),
+                width = 130,
+            )
         }
     }
 }
