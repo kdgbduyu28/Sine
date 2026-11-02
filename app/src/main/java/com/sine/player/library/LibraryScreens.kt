@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -435,8 +436,34 @@ fun ShowDetailScreen(
                 Text("Hold OK on an episode to mark it and everything before it watched", style = MaterialTheme.typography.bodySmall, color = SineColors.muted, modifier = Modifier.padding(top = 6.dp))
                 MoreLikeThis(LibraryKind.SHOWS, key, onOpen = onShow, posterWidth = 110)
             }
+            val owned = show.episodes.filter { it.season == season }
+            val missing = remember(meta, season, owned) {
+                MissingEpisodes.forSeason(meta?.episodes.orEmpty(), season, owned.map { it.number }.toSet(), java.time.LocalDate.now().toString())
+            }
+            // Owned episodes, with aired ones that aren't in the library slotted in by number.
+            val rows: List<Pair<Int, Episode?>> = (owned.map { it.number to it } + missing.map { it.first to null }).sortedBy { it.first }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items(show.episodes.filter { it.season == season }, key = { it.file.uri }) { episode ->
+                if (missing.isNotEmpty()) item(key = "missing-count") {
+                    Text(
+                        "${missing.size} aired episode${if (missing.size == 1) "" else "s"} of this season not in your library",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SineColors.muted,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                }
+                items(rows, key = { (number, e) -> e?.file?.uri ?: "missing:$number" }) { (number, episode) ->
+                    if (episode == null) {
+                        val em = meta?.episodes?.get("$season:$number")
+                        ListItem(
+                            selected = false,
+                            onClick = {},
+                            modifier = Modifier.alpha(0.45f),
+                            leadingContent = { Text("%d".format(number), style = MaterialTheme.typography.titleLarge, color = SineColors.muted, modifier = Modifier.width(40.dp)) },
+                            headlineContent = { Text(listOfNotNull("E%02d".format(number), em?.name).joinToString(" · "), maxLines = 1) },
+                            supportingContent = { Text("Not in your library" + (em?.aired?.let { " · aired $it" } ?: "")) },
+                        )
+                        return@items
+                    }
                     val record = resume.get(episode.file.uri)
                     val em = meta?.episodes?.get("${episode.season}:${episode.number}")
                     ListItem(

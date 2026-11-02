@@ -66,6 +66,7 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
                         e.optString("name").ifEmpty { null },
                         e.optString("overview").ifEmpty { null },
                         image(e.optString("still_path"), "w300"),
+                        e.optString("air_date").takeIf { it.length == 10 },
                     )
                 }
             }

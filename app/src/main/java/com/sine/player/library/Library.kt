@@ -227,7 +227,9 @@ object Library {
             val existing = store.meta[show.key]
             val knownSeasons = existing?.episodes?.keys?.map { it.substringBefore(':').toInt() }?.toSet().orEmpty()
             val missingSeason = show.seasons.any { it !in knownSeasons }
-            if (!force && existing != null && !missingSeason && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            // Details saved before air dates were kept: fetch once more so missing episodes can show.
+            val noAirDates = existing?.episodes?.isNotEmpty() == true && existing.episodes.values.none { it.aired != null }
+            if (!force && existing != null && !missingSeason && !noAirDates && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${show.title}"
             runCatching { tmdb.show(show.title, show.year, show.seasons) }.getOrNull()
                 ?.let { store.putMeta(show.key, it) }

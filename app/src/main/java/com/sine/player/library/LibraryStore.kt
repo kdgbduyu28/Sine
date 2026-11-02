@@ -36,7 +36,20 @@ data class Show(
     val seasons: List<Int> get() = episodes.map { it.season }.distinct().sorted()
 }
 
-data class EpisodeMeta(val name: String?, val overview: String?, val still: String?)
+/** [aired]: first air date as yyyy-MM-dd, when TMDB knows it. */
+data class EpisodeMeta(val name: String?, val overview: String?, val still: String?, val aired: String? = null)
+
+/** Episodes TMDB lists for a season you have part of, that have aired but aren't in the library. */
+object MissingEpisodes {
+    fun forSeason(meta: Map<String, EpisodeMeta>, season: Int, have: Set<Int>, today: String): List<Pair<Int, EpisodeMeta>> =
+        meta.mapNotNull { (key, e) ->
+            val (s, n) = key.split(':').let { it.getOrNull(0)?.toIntOrNull() to it.getOrNull(1)?.toIntOrNull() }
+            if (s != season || n == null || n <= 0 || n in have) return@mapNotNull null
+            // Unknown or future air dates aren't "missing" yet.
+            val aired = e.aired ?: return@mapNotNull null
+            if (aired > today) null else n to e
+        }.sortedBy { it.first }
+}
 
 /** A TMDB movie collection ("The Lord of the Rings Collection"). */
 data class MovieCollection(val id: Int, val name: String, val poster: String?, val backdrop: String?)
@@ -184,7 +197,7 @@ class LibraryStore(private val file: File) {
             .put("genres", JSONArray(m.genres)).put("year", m.year ?: 0).put("at", m.fetchedAt)
             .put("cert", m.certification ?: "")
             .put("collection", m.collection?.let { JSONObject().put("id", it.id).put("name", it.name).put("poster", it.poster ?: "").put("backdrop", it.backdrop ?: "") } ?: JSONObject())
-            .put("episodes", JSONObject().apply { m.episodes.forEach { (k, e) -> put(k, JSONObject().put("name", e.name ?: "").put("overview", e.overview ?: "").put("still", e.still ?: "")) } })
+            .put("episodes", JSONObject().apply { m.episodes.forEach { (k, e) -> put(k, JSONObject().put("name", e.name ?: "").put("overview", e.overview ?: "").put("still", e.still ?: "").put("aired", e.aired ?: "")) } })
 
         fun decodeMeta(o: JSONObject): Meta {
             val eps = o.optJSONObject("episodes") ?: JSONObject()
@@ -200,7 +213,12 @@ class LibraryStore(private val file: File) {
                 year = o.optInt("year").takeIf { it > 0 },
                 episodes = eps.keys().asSequence().associateWith { k ->
                     val e = eps.getJSONObject(k)
-                    EpisodeMeta(e.optString("name").ifEmpty { null }, e.optString("overview").ifEmpty { null }, e.optString("still").ifEmpty { null })
+                    EpisodeMeta(
+                        e.optString("name").ifEmpty { null },
+                        e.optString("overview").ifEmpty { null },
+                        e.optString("still").ifEmpty { null },
+                        e.optString("aired").ifEmpty { null },
+                    )
                 },
                 fetchedAt = o.optLong("at"),
                 collection = o.optJSONObject("collection")?.takeIf { it.optInt("id") > 0 }?.let {
