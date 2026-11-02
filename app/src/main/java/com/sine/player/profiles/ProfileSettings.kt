@@ -13,7 +13,7 @@ import org.json.JSONObject
 object ProfileSettings {
     val keys = listOf(
         "audio_language", "subtitle_language", "subtitle_mode",
-        "subtitle_scale", "subtitle_bottom", "subtitle_background", "subtitle_color", "subtitle_edge",
+        "subtitle_scale", "subtitle_bottom", "subtitle_background", "subtitle_color", "subtitle_edge", "subtitles_in_bars",
         "best_audio", "clean_sdh",
     )
 

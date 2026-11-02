@@ -250,6 +250,14 @@ fun SettingsScreen(
                 })
             }
             item {
+                SettingRow(
+                    "Subtitles in the black bars",
+                    "On wide films (2.39:1) place subtitles in the bar under the picture instead of over it",
+                    onOff(s.subtitlesInBars),
+                    { s.subtitlesInBars = !s.subtitlesInBars },
+                )
+            }
+            item {
                 SettingRow("Background box", "Dark box behind text instead of an outline", onOff(s.subtitleBackground), {
                     s.subtitleBackground = !s.subtitleBackground
                 })

@@ -361,6 +361,7 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
     val color = settings.subtitleColor
     val edge = settings.subtitleEdge
     val aspect = session.aspect
+    val inBars = settings.subtitlesInBars
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
@@ -386,6 +387,7 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
                 AspectMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             }
             session.surfaceView = view.videoSurfaceView as? android.view.SurfaceView
+            view.subtitleView?.let { placeSubtitles(view, it, inBars) }
             view.subtitleView?.apply {
                 setApplyEmbeddedStyles(true)
                 setApplyEmbeddedFontSizes(false)
@@ -404,6 +406,22 @@ private fun VideoSurface(session: PlayerSession, settings: AppSettings) {
             }
         },
     )
+}
+
+/**
+ * Media3 draws subtitles inside the video's own frame, so on a 2.39:1 film they cover the picture.
+ * With [fullScreen] the subtitle view moves up to cover the whole screen: text then sits in the
+ * bottom black bar, and Blu-ray PGS (authored for a 16:9 frame) keeps its shape on cropped remuxes.
+ */
+@UnstableApi
+private fun placeSubtitles(view: PlayerView, subtitles: SubtitleView, fullScreen: Boolean) {
+    val frame = view.findViewById<ViewGroup>(androidx.media3.ui.R.id.exo_content_frame) ?: return
+    val target: ViewGroup = if (fullScreen) view else frame
+    if (subtitles.parent === target) return
+    (subtitles.parent as? ViewGroup)?.removeView(subtitles)
+    // Right above the video frame, under any overlays PlayerView adds after it.
+    val index = if (fullScreen) view.indexOfChild(frame) + 1 else frame.childCount
+    target.addView(subtitles, index, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 }
 
 @UnstableApi

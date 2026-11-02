@@ -93,6 +93,8 @@ class AppSettings(context: Context) {
     var subtitleMode by enumPref("subtitle_mode", com.sine.player.player.SubtitleMode.FOREIGN)
     var subtitleScale by pref("subtitle_scale", 1.0f)
     var subtitleBottom by pref("subtitle_bottom", 0.08f)
+    /** Position subtitles against the screen rather than the picture, so on wide films they sit in the black bar. */
+    var subtitlesInBars by pref("subtitles_in_bars", true)
     var subtitleBackground by pref("subtitle_background", false)
     var subtitleColor by enumPref("subtitle_color", com.sine.player.player.SubtitleColor.WHITE)
     var subtitleEdge by enumPref("subtitle_edge", com.sine.player.player.SubtitleEdge.OUTLINE)

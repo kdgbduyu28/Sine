@@ -547,6 +547,10 @@ class MpvPlayer(
             lib.setPropertyString("sub-border-style", if (boxed) "opaque-box" else "outline-and-shadow")
             lib.setPropertyString("sub-back-color", if (boxed) "#99000000" else "#00000000")
             lib.setPropertyString("sub-filter-sdh", if (com.sine.player.SineApp.instance.settings.cleanSdh) "yes" else "no")
+            // Text and ASS subtitles in the black bars rather than over the picture.
+            val inBars = if (com.sine.player.SineApp.instance.settings.subtitlesInBars) "yes" else "no"
+            lib.setPropertyString("sub-use-margins", inBars)
+            lib.setPropertyString("sub-ass-force-margins", inBars)
         }
     }
 
