@@ -32,6 +32,11 @@ object SleepTimer {
     const val END_OF_VIDEO = -1
     val choices = listOf(15, 30, 45, 60, 90, END_OF_VIDEO)
 
+    /** The volume fades out over the last half minute so the pause isn't a jolt. */
+    const val FADE_MS = 30_000L
+
+    fun fadeVolume(remainingMs: Long): Float = (remainingMs.toFloat() / FADE_MS).coerceIn(0.05f, 1f)
+
     fun label(minutes: Int) = if (minutes == END_OF_VIDEO) "End of this video" else "$minutes minutes"
 
     /** Red-button style cycling: off → 30 → 60 → 90 → end of video → off. */

@@ -42,4 +42,11 @@ class UpNextTest {
         assertNull(SleepTimer.cycle(SleepTimer.END_OF_VIDEO))
         assertEquals("End of this video", SleepTimer.label(SleepTimer.END_OF_VIDEO))
     }
+
+    @Test
+    fun `sleep fade goes from full volume to a whisper over the last half minute`() {
+        org.junit.Assert.assertEquals(1f, SleepTimer.fadeVolume(30_000), 0.001f)
+        org.junit.Assert.assertEquals(0.5f, SleepTimer.fadeVolume(15_000), 0.001f)
+        org.junit.Assert.assertEquals(0.05f, SleepTimer.fadeVolume(500), 0.001f)
+    }
 }

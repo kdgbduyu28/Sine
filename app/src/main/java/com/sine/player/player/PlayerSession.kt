@@ -283,15 +283,38 @@ class PlayerSession(
     }
 
     fun setSleepTimer(minutes: Int?) {
+        endSleepFade()
         sleepChoice = minutes
         sleepAt = minutes?.takeIf { it > 0 }?.let { System.currentTimeMillis() + it * 60_000L }
         notice = minutes?.let { "Sleep timer: ${SleepTimer.label(it).lowercase()}" } ?: "Sleep timer off"
+    }
+
+    /** True while the last 30 seconds before the sleep timer fade the volume down. */
+    private var sleepFading = false
+
+    /** Volume for the sleep fade, from 1 at 30 s before sleeping down to a whisper at the end. */
+    private fun fadeForSleep(remainingMs: Long) {
+        val p = player ?: return
+        if (remainingMs >= SleepTimer.FADE_MS) {
+            endSleepFade()
+            return
+        }
+        sleepFading = true
+        p.volume = SleepTimer.fadeVolume(remainingMs)
+    }
+
+    private fun endSleepFade() {
+        if (!sleepFading) return
+        sleepFading = false
+        player?.volume = 1f
     }
 
     private fun sleepNow() {
         sleepChoice = null
         sleepAt = null
         pause()
+        // Paused first so the full volume doesn't blip; it's back for whenever playback resumes.
+        endSleepFade()
         saveProgress()
         slept = true
         notice = "Sleep timer: paused"
@@ -908,7 +931,11 @@ class PlayerSession(
         }
         updateSegment()
         updateUpNext()
-        sleepAt?.let { if (System.currentTimeMillis() >= it) sleepNow() }
+        sleepAt?.let { at ->
+            val remaining = at - System.currentTimeMillis()
+            if (remaining <= 0) sleepNow() else fadeForSleep(remaining)
+        }
+        if (sleepChoice == SleepTimer.END_OF_VIDEO && durationMs > 0) fadeForSleep(durationMs - positionMs)
         val sampleNow = System.currentTimeMillis()
         if (sampleNow - lastRateSampleAt >= 1000) {
             val elapsed = if (lastRateSampleAt == 0L) 1000 else sampleNow - lastRateSampleAt
