@@ -23,7 +23,7 @@ object Backup {
     private fun prefsNames(context: Context): List<String> {
         val dir = File(context.applicationInfo.dataDir, "shared_prefs")
         val all = dir.listFiles()?.map { it.nameWithoutExtension }.orEmpty()
-        val fixed = listOf("settings", "smb_servers", "remote_servers", "profiles", "key_map", "file_memory")
+        val fixed = listOf("settings", "smb_servers", "remote_servers", "profiles", "key_map", "file_memory", "intro_memory", "auto_downloads")
         return fixed + all.filter { it == "resume" || it.startsWith("resume_") }
     }
 
