@@ -131,6 +131,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 ## Phase 12: power tools
 
+- **Paused too long:** after 5 minutes paused, the TV's own screensaver and sleep are allowed again, so a still frame doesn't burn into an OLED.
 - **Back twice to stop:** while a video plays, one Back shows a reminder and a second within two seconds stops (paused videos stop at once; setting to turn it off).
 - **Format card:** for five seconds when a video starts, its title and what's really playing: resolution, Dolby Vision/HDR, codec, audio format and channels, Atmos, and whether audio goes to the receiver or is decoded on the TV.
 - **Up next, still watching, sleep timer:** a countdown card before the next episode (from the start of the credits when Sine knows them, else the last 20 seconds; OK plays now, Back stops after this one); after 3 episodes in a row with no button pressed Sine pauses and asks "Still watching?"; the moon button sets a sleep timer (15–90 minutes or end of this video) that fades the sound out over the last 30 seconds, pauses and lets the TV sleep.

@@ -935,8 +935,17 @@ class PlayerSession(
     // endregion
 
     /** Called twice a second by the screen. */
+    /** When playback paused (0 while playing); after [PAUSED_SCREEN_MS] the screen may sleep. */
+    private var pausedSince = 0L
+    private var screenReleased = false
+
     fun tick() {
         val p = player ?: return
+        // A paused picture left on an OLED for hours burns in: let the TV's screensaver take over.
+        if (!isPlaying && pausedSince > 0 && !screenReleased && System.currentTimeMillis() - pausedSince >= PAUSED_SCREEN_MS) {
+            screenReleased = true
+            host.onSleep()
+        }
         val stats = engine?.stats()
         stats?.let {
             videoDecoder = it.videoDecoder
@@ -993,6 +1002,15 @@ class PlayerSession(
         override fun onIsPlayingChanged(playing: Boolean) {
             isPlaying = playing
             if (!playing) saveProgress()
+            if (playing) {
+                pausedSince = 0L
+                if (screenReleased) {
+                    screenReleased = false
+                    host.onWake()
+                }
+            } else {
+                pausedSince = System.currentTimeMillis()
+            }
         }
 
         override fun onPlaybackStateChanged(state: Int) {
@@ -1245,6 +1263,9 @@ class PlayerSession(
         const val HOLD_RESUME = "resume"
         const val HOLD_DISPLAY = "display"
         const val HOLD_KIDS = "kids"
+
+        /** Paused this long, the TV may show its screensaver (and sleep) as usual. */
+        const val PAUSED_SCREEN_MS = 5 * 60_000L
 
         fun subtitleMime(fileName: String): String = when (MediaFiles.extension(fileName)) {
             "ass", "ssa" -> MimeTypes.TEXT_SSA
