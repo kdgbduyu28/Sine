@@ -949,6 +949,19 @@ class PlayerSession(
         notice = "Channel $channelDigits–"
     }
 
+    /** Live TV: the channel watched before this one. */
+    private var previousChannelUri: String? = null
+
+    /** Live TV: back to the channel watched before this one. */
+    fun lastChannel() {
+        val target = previousChannelUri?.let { uri -> items.indexOfFirst { it.uri == uri } } ?: -1
+        if (target < 0 || target == index) {
+            notice = "No previous channel"
+            return
+        }
+        player?.seekToDefaultPosition(target)
+    }
+
     private fun tuneChannelNumber(number: String) {
         val liveTv = com.sine.player.SineApp.instance.liveTv
         val target = items.indexOfFirst { item -> liveTv.channelFor(item.uri)?.number?.let { LiveChannelNumbers.same(it, number) } == true }
@@ -1059,6 +1072,10 @@ class PlayerSession(
             val previous = lastItemUri
             val p = player ?: return
             val newIndex = p.currentMediaItemIndex
+            // Live TV: remember the channel we came from for the last-channel button.
+            if (previous != null && previous != mediaItem?.mediaId && com.sine.player.SineApp.instance.liveTv.channelFor(previous) != null) {
+                previousChannelUri = previous
+            }
             if (previous != null && previous != mediaItem?.mediaId) {
                 items.firstOrNull { it.uri == previous }?.let { item ->
                     val finished = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO

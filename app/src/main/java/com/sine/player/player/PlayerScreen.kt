@@ -173,6 +173,10 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             }
             return consume()
         }
+        if (panel == null && code == AndroidKeyEvent.KEYCODE_LAST_CHANNEL && session.isLiveChannel) {
+            session.lastChannel()
+            return consume()
+        }
         // On a live channel the number keys tune a channel by its number instead.
         if (panel == null && code in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9 && session.isLiveChannel) {
             session.typeChannelDigit(code - AndroidKeyEvent.KEYCODE_0)

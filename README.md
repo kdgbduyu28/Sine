@@ -95,7 +95,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - **HDHomeRun tuners**, found automatically or by IP, with their guide.
 - **Jellyfin, Emby and Plex Live TV:** channels and guide from a server you've already added; the server tunes the channel when you play it (Plex needs a DVR set up).
 - Playlists that need a User-Agent, Referer or Origin (`#EXTVLCOPT` lines or Kodi's `url|User-Agent=…`) work in both engines.
-- Channels with now/next, a four-hour guide grid, favourites (long-press OK), channel ▲▼ zapping in the player, and number keys to tune a channel by its number.
+- Channels with now/next, a four-hour guide grid, favourites (long-press OK), channel ▲▼ zapping in the player, number keys to tune a channel by its number, and the last-channel button to go back to the previous one.
 - **Catch-up** on channels whose playlist offers it (`catchup="default|append|shift|flussonic|xc"`, `catchup-source`, `catchup-days`): scroll left in the guide on channels marked ↺ and press OK on a past programme.
 - **Recording:** hold OK on a current or upcoming programme in the guide. M3U and HDHomeRun channels record on this TV to `Sine/Recordings` (MPEG-TS copied as is; HLS followed segment by segment; encrypted streams can't be recorded); Jellyfin/Emby channels are recorded by the server. Recordings start a minute early and run two minutes over; allow "Alarms & reminders" so they start on time. Plex recordings are scheduled in Plex itself.
 
