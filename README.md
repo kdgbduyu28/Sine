@@ -111,6 +111,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - Resumes interrupted downloads, shows speed and time left, and can wait for the overnight window (1–6 AM).
 - A downloaded video plays from the local copy automatically, even when the NAS or server is off, and still syncs progress to the server afterwards.
 - Optional auto-delete: when watched, or 1 or 7 days after.
+- **Keep next 3 downloaded** on a show page: the three episodes after the last one watched stay downloaded and are topped up as you watch (with auto-delete, a rolling window).
 
 ## Phase 10: smart subtitles
 

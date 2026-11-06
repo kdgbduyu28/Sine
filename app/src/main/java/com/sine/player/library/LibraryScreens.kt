@@ -474,6 +474,15 @@ fun ShowDetailScreen(
                         if (seasonWatched) resume.forget(e.file.uri) else resume.markWatched(e.file.uri, "${show.title} ${Library.episodeTitle(show, e)}", e.file.folder)
                     }
                 }) { Text(if (seasonWatched) "Mark season unwatched" else "Mark season watched") }
+                var keepDownloaded by remember(key) { mutableStateOf(com.sine.player.downloads.AutoDownloads.isOn(context, key)) }
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                OutlinedButton(onClick = {
+                    com.sine.player.downloads.AutoDownloads.toggle(context, key)
+                    keepDownloaded = !keepDownloaded
+                    if (keepDownloaded) scope.launch { runCatching { com.sine.player.downloads.AutoDownloads.topUp(context) } }
+                }, modifier = Modifier.padding(top = 8.dp)) {
+                    Text(if (keepDownloaded) "✓ Keeping next ${com.sine.player.downloads.AutoDownloads.AHEAD} downloaded" else "Keep next ${com.sine.player.downloads.AutoDownloads.AHEAD} downloaded")
+                }
                 Text("Hold OK on an episode to mark it and everything before it watched", style = MaterialTheme.typography.bodySmall, color = SineColors.muted, modifier = Modifier.padding(top = 6.dp))
                 MoreLikeThis(LibraryKind.SHOWS, key, onOpen = onShow, posterWidth = 110)
             }

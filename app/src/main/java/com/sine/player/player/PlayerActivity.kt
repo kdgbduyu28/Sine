@@ -449,6 +449,8 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
 
     override fun onFinished(ended: Boolean) {
         finishedByPlayback = ended
+        // Kept shows: the next episodes start downloading as soon as this one is done.
+        SineApp.instance.scope.launch { runCatching { com.sine.player.downloads.AutoDownloads.topUp(SineApp.instance) } }
         finishWithResult()
     }
 

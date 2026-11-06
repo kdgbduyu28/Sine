@@ -45,6 +45,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             copy(next)
         }
         Downloads.cleanup()
+        runCatching { AutoDownloads.topUp(applicationContext) }
         Result.success()
     }
 
