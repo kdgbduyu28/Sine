@@ -765,7 +765,7 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                     StepperRow(
                         "Volume boost",
                         "${session.volumeBoost}%",
-                        hint = if (settings.passthrough && !settings.nightMode && !settings.dialogueBoost) "Not for Dolby/DTS sent to a receiver (passthrough)" else "For quiet files; a limiter stops harsh clipping",
+                        hint = if (settings.passthrough && !settings.nightModeNow && !settings.dialogueBoost) "Not for Dolby/DTS sent to a receiver (passthrough)" else "For quiet files; a limiter stops harsh clipping",
                         onStep = { d, _ -> session.setVolumeBoost(session.volumeBoost + d * 10) },
                     )
                 }
@@ -781,6 +781,13 @@ private fun SidePanelHost(session: PlayerSession, panel: Panel, onPanel: (Panel?
                     ChoiceRow("Night mode", "Quieter explosions, clearer speech (turns off passthrough)", settings.nightMode, {
                         settings.nightMode = !settings.nightMode
                         session.switchEngine(session.engineKind, if (settings.nightMode) "Night mode on" else "Night mode off")
+                    })
+                }
+                item {
+                    ChoiceRow("Night mode after 10 PM", "Switches on by itself from 10 PM to 7 AM for videos started then", settings.nightModeLate, {
+                        settings.nightModeLate = !settings.nightModeLate
+                        val late = com.sine.player.data.NightHours.isLate(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY))
+                        if (late && !settings.nightMode) session.switchEngine(session.engineKind, if (settings.nightModeLate) "Night mode on" else "Night mode off")
                     })
                 }
                 item {

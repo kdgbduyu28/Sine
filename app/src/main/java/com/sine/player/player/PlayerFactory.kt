@@ -104,8 +104,8 @@ object PlayerFactory {
 
     fun options(settings: AppSettings, dolbyVisionBaseLayer: Boolean) = EngineOptions(
         // Night mode and dialogue boost work on decoded audio, so they switch passthrough off.
-        passthrough = settings.passthrough && !settings.nightMode && !settings.dialogueBoost,
-        nightMode = settings.nightMode,
+        passthrough = settings.passthrough && !settings.nightModeNow && !settings.dialogueBoost,
+        nightMode = settings.nightModeNow,
         dialogueBoost = settings.dialogueBoost,
         buffer = Buffers.forDevice(com.sine.player.SineApp.instance, settings.bufferSize),
         tunneling = settings.tunneling,
@@ -124,7 +124,7 @@ object PlayerFactory {
                 settings.mpvInterpolation,
                 settings.mpvShaders.split('|').filter { it.isNotBlank() }.toSet(),
             )
-        }.getOrDefault(emptyMap()) + (if (settings.nightMode) mapOf("af" to AudioBoostProcessor.MPV_NIGHT_FILTER) else emptyMap()),
+        }.getOrDefault(emptyMap()) + (if (settings.nightModeNow) mapOf("af" to AudioBoostProcessor.MPV_NIGHT_FILTER) else emptyMap()),
     )
 
     /**

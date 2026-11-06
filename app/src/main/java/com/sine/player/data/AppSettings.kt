@@ -151,6 +151,12 @@ class AppSettings(context: Context) {
     var transcodeAwayOnly by pref("transcode_away_only", true)
     var skipSegments by enumPref("skip_segments", SkipMode.BUTTON)
     var nightMode by pref("night_mode", false)
+    /** Night mode by itself from 10 PM to 7 AM. */
+    var nightModeLate by pref("night_mode_late", false)
+
+    /** Whether a video starting now gets night mode. */
+    val nightModeNow: Boolean
+        get() = nightMode || (nightModeLate && NightHours.isLate(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)))
     var dialogueBoost by pref("dialogue_boost", false)
     var seekPreviews by pref("seek_previews", true)
     var castReceiver by pref("cast_receiver", false)
@@ -268,4 +274,12 @@ class AppSettings(context: Context) {
         val seekSteps = listOf(5, 10, 15, 30, 60)
         val photoIntervals = listOf(4, 8, 15, 30, 60)
     }
+}
+
+/** The hours when "night mode after 10 PM" applies. */
+object NightHours {
+    const val FROM = 22
+    const val UNTIL = 7
+
+    fun isLate(hour: Int): Boolean = hour >= FROM || hour < UNTIL
 }
