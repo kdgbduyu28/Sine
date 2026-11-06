@@ -173,6 +173,11 @@ fun PlayerScreen(session: PlayerSession, onExit: () -> Unit) {
             }
             return consume()
         }
+        // On a live channel the number keys tune a channel by its number instead.
+        if (panel == null && code in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9 && session.isLiveChannel) {
+            session.typeChannelDigit(code - AndroidKeyEvent.KEYCODE_0)
+            return consume()
+        }
         if (keyMap.numberKeysJump && panel == null && session.durationMs > 0 && code in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9) {
             val tenth = code - AndroidKeyEvent.KEYCODE_0
             session.seekTo(session.durationMs * tenth / 10)

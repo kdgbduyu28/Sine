@@ -935,12 +935,41 @@ class PlayerSession(
     // endregion
 
     /** Called twice a second by the screen. */
+    /** Live TV: channel number digits typed on the remote; tuned [CHANNEL_ENTRY_MS] after the last one. */
+    var channelDigits by mutableStateOf("")
+        private set
+    private var channelDigitsAt = 0L
+
+    val isLiveChannel: Boolean
+        get() = current?.uri?.let { com.sine.player.SineApp.instance.liveTv.channelFor(it) } != null
+
+    fun typeChannelDigit(digit: Int) {
+        channelDigits = (channelDigits + digit).takeLast(4)
+        channelDigitsAt = System.currentTimeMillis()
+        notice = "Channel $channelDigits–"
+    }
+
+    private fun tuneChannelNumber(number: String) {
+        val liveTv = com.sine.player.SineApp.instance.liveTv
+        val target = items.indexOfFirst { item -> liveTv.channelFor(item.uri)?.number?.let { LiveChannelNumbers.same(it, number) } == true }
+        if (target < 0) {
+            notice = "No channel $number in this list"
+            return
+        }
+        if (target != index) player?.seekToDefaultPosition(target)
+    }
+
     /** When playback paused (0 while playing); after [PAUSED_SCREEN_MS] the screen may sleep. */
     private var pausedSince = 0L
     private var screenReleased = false
 
     fun tick() {
         val p = player ?: return
+        if (channelDigits.isNotEmpty() && System.currentTimeMillis() - channelDigitsAt >= CHANNEL_ENTRY_MS) {
+            val number = channelDigits
+            channelDigits = ""
+            tuneChannelNumber(number)
+        }
         // A paused picture left on an OLED for hours burns in: let the TV's screensaver take over.
         if (!isPlaying && pausedSince > 0 && !screenReleased && System.currentTimeMillis() - pausedSince >= PAUSED_SCREEN_MS) {
             screenReleased = true
@@ -1267,6 +1296,9 @@ class PlayerSession(
         /** Paused this long, the TV may show its screensaver (and sleep) as usual. */
         const val PAUSED_SCREEN_MS = 5 * 60_000L
 
+        /** Pause after the last digit before a typed channel number is tuned. */
+        const val CHANNEL_ENTRY_MS = 1_800L
+
         fun subtitleMime(fileName: String): String = when (MediaFiles.extension(fileName)) {
             "ass", "ssa" -> MimeTypes.TEXT_SSA
             "vtt" -> MimeTypes.TEXT_VTT
@@ -1294,5 +1326,13 @@ class PlayerSession(
                 .build()
 
         val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+    }
+}
+
+/** Channel numbers as typed on a remote: "7" finds "007", "12" finds "12" (and "12.1" for ATSC subchannels as 121). */
+object LiveChannelNumbers {
+    fun same(channelNumber: String, typed: String): Boolean {
+        val digits = channelNumber.filter { it.isDigit() }.trimStart('0')
+        return digits.isNotEmpty() && digits == typed.trimStart('0')
     }
 }
