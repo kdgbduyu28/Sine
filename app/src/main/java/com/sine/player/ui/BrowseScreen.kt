@@ -138,13 +138,14 @@ fun BrowseScreen(
                 itemsIndexed(list, key = { _, entry -> entry.uri }) { index, entry ->
                     val record = remember(entry.uri, resumeVersion) { if (entry.isVideo) resume.get(entry.uri) else null }
                     val downloaded = remember(entry.uri, SineApp.instance.downloads.items) { SineApp.instance.downloads.finished(entry.uri) != null }
+                    val quality = remember(entry.name) { if (entry.isVideo) com.sine.player.library.Versions.tags(entry.name) else null }
                     val detail = when {
                         entry.isDirectory -> null
                         downloaded && record?.watched != true -> "Downloaded · ${MediaFiles.formatSize(entry.size)}"
                         record?.watched == true -> "Watched · ${MediaFiles.formatSize(entry.size)}"
                         record?.resumable == true -> "${Time.remaining(record.durationMs - record.positionMs)} · ${MediaFiles.formatSize(entry.size)}"
                         else -> MediaFiles.formatSize(entry.size)
-                    }
+                    }?.let { base -> listOfNotNull(base.ifBlank { null }, quality).joinToString(" · ") }
                     ListItem(
                         selected = false,
                         onClick = {

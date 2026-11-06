@@ -36,6 +36,12 @@ object Versions {
         MediaFiles.formatSize(v.size).ifEmpty { null },
     ).joinToString(" · ").ifEmpty { "Version" }
 
+    /** "2160p · Dolby Vision · Remux" from a file name, for file lists; null when the name says nothing. */
+    fun tags(fileName: String): String? = info(fileName, 0).let { v ->
+        listOfNotNull(v.resolution?.let { if (it == 480) "SD" else "${it}p" }, v.hdr, "Remux".takeIf { v.remux }, v.edition)
+            .joinToString(" · ").ifEmpty { null }
+    }
+
     /** Higher is better: resolution, then HDR kind, then remux, then size. */
     fun score(v: VersionInfo): Long {
         val hdr = when (v.hdr) {

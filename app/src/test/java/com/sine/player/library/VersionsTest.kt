@@ -53,4 +53,10 @@ class VersionsTest {
         org.junit.Assert.assertNull(Versions.resumeFrom(2, versions, records))
         org.junit.Assert.assertEquals(stopped, Versions.resumeFrom(0, versions, records))
     }
+
+    @Test
+    fun `file list tags come from the name`() {
+        org.junit.Assert.assertEquals("2160p · Dolby Vision · Remux", Versions.tags("Dune.2021.2160p.UHD.BluRay.REMUX.DV.HDR.TrueHD.Atmos-GRP.mkv"))
+        org.junit.Assert.assertNull(Versions.tags("holiday video.mp4"))
+    }
 }
