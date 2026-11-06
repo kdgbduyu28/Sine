@@ -33,6 +33,10 @@ object DolbyVisionP7 {
         8 in profiles && 7 !in profiles
     }
 
+    /** RPUs converted and dropped since the last profile 7 track started, for the stats overlay. */
+    val convertedRpus = java.util.concurrent.atomic.AtomicLong()
+    val failedRpus = java.util.concurrent.atomic.AtomicLong()
+
     fun isProfile7(format: Format): Boolean = MediaInfo.dolbyVisionProfile(format) == 7
 
     /** The same track, announced as profile 8 so the decoder for 8.1 takes it. */
@@ -71,8 +75,10 @@ object DolbyVisionP7 {
                         if (rpu != null) {
                             out.append(START_CODE, 0, START_CODE.size)
                             out.append(rpu, 0, rpu.size)
+                            convertedRpus.incrementAndGet()
                         } else {
                             failures++
+                            failedRpus.incrementAndGet()
                         }
                     }
                     else -> {
@@ -195,6 +201,8 @@ private class DolbyVisionP7TrackOutput(private val delegate: TrackOutput, privat
     override fun format(format: Format) {
         converting = DolbyVisionP7.isProfile7(format)
         if (converting) {
+            DolbyVisionP7.convertedRpus.set(0)
+            DolbyVisionP7.failedRpus.set(0)
             delegate.format(DolbyVisionP7.toProfile81(format))
             onConverted()
         } else {

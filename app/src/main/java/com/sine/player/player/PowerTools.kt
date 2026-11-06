@@ -44,6 +44,9 @@ internal fun StatsOverlay(session: PlayerSession, modifier: Modifier) {
         video?.let { v ->
             add("Video      ${MediaInfo.videoCodec(v)} ${v.width}×${v.height} ${MediaInfo.frameRate(v.frameRate) ?: ""}".trimEnd())
             add("Range      ${session.dynamicRangeLabel(v)}")
+            if (session.dolbyVisionConverted) {
+                add("DV 7→8.1   ${DolbyVisionP7.convertedRpus.get()} RPUs converted, ${DolbyVisionP7.failedRpus.get()} dropped")
+            }
         }
         add("Decoder    ${session.videoDecoder ?: "—"}")
         audio?.let { add("Audio      ${MediaInfo.audioLabel(it)}") }
