@@ -67,7 +67,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 ## Phase 4: playback extras
 
 - **Chapters** from MKV files: chapter list, marks on the seek bar, next/previous chapter buttons.
-- **Skip intro / recap / credits** using Jellyfin's media segments or chapter names: a button (OK skips; on credits it goes to the next episode) or automatic.
+- **Skip intro / recap / credits** using Jellyfin's media segments or chapter names: a button (OK skips; on credits it goes to the next episode) or automatic. Without either, Sine learns: skip the intro by hand in two episodes of a season and the rest offer "Skip intro" at that spot (as a button only).
 - **Seek previews:** a thumbnail and chapter name while scrubbing.
 - **Audio sync** offset, remembered per file. **Night mode** (evens out loud and quiet) and **dialogue boost** (louder centre channel on 5.1/7.1); both turn passthrough off.
 - **Blu-ray/DVD ISO** files play through mpv (local files only).

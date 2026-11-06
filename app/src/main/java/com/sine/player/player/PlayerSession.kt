@@ -208,7 +208,22 @@ class PlayerSession(
     fun setChapters(forUri: String, found: List<Chapter>, serverSegments: List<Segment>) {
         if (current?.uri != forUri) return
         chapters = found
-        segments = serverSegments.ifEmpty { Segments.fromChapters(found, durationMs) }
+        val known = serverSegments.ifEmpty { Segments.fromChapters(found, durationMs) }
+        // No intro from the server or chapters: use the one learned from skips in this folder.
+        learnedIntro = if (known.none { it.type == SegmentType.INTRO }) current?.folderUri?.let { introMemory.learned(it) } else null
+        segments = known + listOfNotNull(learnedIntro)
+    }
+
+    /** Intro found from earlier skips in this folder (never auto-skipped). */
+    private var learnedIntro: Segment? = null
+    private val introMemory by lazy { IntroMemory(com.sine.player.SineApp.instance) }
+
+    /** Remembers a manual jump over what looks like an intro, when nothing else marks one. */
+    private fun maybeLearnIntro(fromMs: Long, toMs: Long) {
+        val item = current ?: return
+        val folder = item.folderUri ?: return
+        if (segments.any { it.type == SegmentType.INTRO && it != learnedIntro }) return
+        if (IntroLearning.isIntroSkip(fromMs, toMs, durationMs)) introMemory.record(folder, item.uri, fromMs, toMs)
     }
 
     fun skipSegment() {
@@ -596,6 +611,7 @@ class PlayerSession(
 
     fun commitSeek() {
         val target = seekTargetMs ?: return
+        maybeLearnIntro(positionMs, target)
         player?.seekTo(target)
         positionMs = target
         seekTargetMs = null
@@ -801,7 +817,7 @@ class PlayerSession(
     private fun updateSegment() {
         val mode = settings.skipSegments
         val segment = if (mode == com.sine.player.data.SkipMode.OFF) null else segments.firstOrNull { it.contains(positionMs) && positionMs < it.endMs - 2_000 }
-        if (segment != null && mode == com.sine.player.data.SkipMode.AUTO && segment.type != SegmentType.CREDITS && autoSkipped.add(segment)) {
+        if (segment != null && mode == com.sine.player.data.SkipMode.AUTO && segment.type != SegmentType.CREDITS && segment != learnedIntro && autoSkipped.add(segment)) {
             seekTo(segment.endMs)
             notice = "Skipped ${segment.type.name.lowercase()}"
             activeSegment = null
@@ -1044,6 +1060,7 @@ class PlayerSession(
                     chaptersFor = item.uri
                     chapters = emptyList()
                     segments = emptyList()
+                    learnedIntro = null
                     autoSkipped.clear()
                     host.onItemReady(item)
                 }
