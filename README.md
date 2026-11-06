@@ -30,7 +30,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 
 **Sorting:** in any folder, Menu on the remote switches between name, newest first and largest first (folders stay on top); the choice is remembered.
 
-**Thumbnails:** video files in folder lists show a frame from about 10% in (cached); by default only for USB and internal storage, or everywhere in Settings → Files.
+**Thumbnails:** video files in folder lists show a frame from about 10% in (cached); by default only for USB and internal storage, or everywhere in Settings → Files. File rows also show what the name says about quality (2160p · Dolby Vision · Remux · Extended).
 
 **Folders:** hold OK on a folder → Mark folder as watched / unwatched, for shows that aren't in the library.
 
@@ -60,7 +60,7 @@ All of these sit in Home → Network, next to SMB shares. "Add server" picks the
 - **Versions:** when a movie is in the library more than once (4K remux and 1080p, theatrical and extended), its page lists each as "2160p · Dolby Vision · Remux · 58 GB" and starts with the one you're watching, else the best. Picking another copy of the same cut resumes where the other one stopped.
 - **Collections:** films from the same TMDB collection grouped on the home screen and on their own page, in release order (needs two or more in your library); the page also lists the collection's films you don't have yet, greyed out, with release dates for upcoming ones.
 - **Recently added** from your servers: the newest movies and episodes on each Jellyfin/Emby/Plex server, newest first.
-- **Home rows:** Next up, Movies, TV shows; poster grids you can sort (recently added, A–Z ignoring "The", newest, top rated) and filter (unwatched, genre), remembered per grid; movie and show pages with resume, start over, watched, seasons, a **Trailer** button (TMDB trailer in the YouTube app) and **More like this** from your own library.
+- **Home rows:** Next up, Movies, TV shows (with how many episodes are unwatched); poster grids you can sort (recently added, A–Z ignoring "The", newest, top rated) and filter (unwatched, genre), remembered per grid; movie and show pages with resume, start over, watched, seasons, a **Trailer** button (TMDB trailer in the YouTube app) and **More like this** from your own library.
 - **TV launcher:** Continue watching / Play next entries that reopen Sine where you left off.
 - **Trakt:** sign in with your own Trakt API app; scrobbling, two-way watched sync, and My list synced with your Trakt watchlist (titles in your library).
 
