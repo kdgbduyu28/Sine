@@ -364,6 +364,8 @@ fun MovieDetailScreen(
     }
     val meta = store.meta[key]
     val record = resume.get(movie.file.uri)
+    // Progress from this version, or from another copy of the same cut.
+    val resumeRecord = Versions.resumeFrom(versions.indexOf(movie), versionInfo, versions.map { resume.get(it.file.uri) })
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Box(Modifier.fillMaxSize().background(SineColors.background)) {
@@ -394,9 +396,9 @@ fun MovieDetailScreen(
             meta?.overview?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = SineColors.text, maxLines = 8, modifier = Modifier.width(720.dp)) }
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (record?.resumable == true) {
-                    Button(onClick = { onPlay(movie.file.uri, meta?.title ?: movie.title, movie.file.folder, record.positionMs) }, modifier = Modifier.focusRequester(focus)) {
-                        Text("Resume from ${Time.format(record.positionMs)}")
+                if (resumeRecord != null) {
+                    Button(onClick = { onPlay(movie.file.uri, meta?.title ?: movie.title, movie.file.folder, resumeRecord.positionMs) }, modifier = Modifier.focusRequester(focus)) {
+                        Text("Resume from ${Time.format(resumeRecord.positionMs)}" + if (resumeRecord.uri != movie.file.uri) " (other version)" else "")
                     }
                     OutlinedButton(onClick = { onPlay(movie.file.uri, meta?.title ?: movie.title, movie.file.folder, 1) }) { Text("Start over") }
                 } else {

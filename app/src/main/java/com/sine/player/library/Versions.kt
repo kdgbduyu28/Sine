@@ -47,6 +47,19 @@ object Versions {
         return (v.resolution ?: 0) * 1_000_000_000L + hdr * 100_000_000L + (if (v.remux) 50_000_000L else 0) + v.size / 1_000_000_000
     }
 
+    /**
+     * Where [chosen] should resume: its own progress, else the latest progress on another version
+     * of the same cut (a 1080p copy picks up where the 4K remux stopped; an extended cut doesn't).
+     */
+    fun resumeFrom(chosen: Int, versions: List<VersionInfo>, records: List<com.sine.player.data.PlaybackRecord?>): com.sine.player.data.PlaybackRecord? {
+        records.getOrNull(chosen)?.let { if (it.resumable || it.watched) return it.takeIf { r -> r.resumable } }
+        val edition = versions.getOrNull(chosen)?.edition
+        return records.indices
+            .filter { it != chosen && versions.getOrNull(it)?.edition == edition }
+            .mapNotNull { records[it]?.takeIf { r -> r.resumable } }
+            .maxByOrNull { it.updatedAt }
+    }
+
     /** The version to start with: the one being watched, else the best. */
     fun pick(versions: List<VersionInfo>, inProgress: Int): Int =
         if (inProgress in versions.indices) inProgress else versions.indices.maxByOrNull { score(versions[it]) } ?: 0

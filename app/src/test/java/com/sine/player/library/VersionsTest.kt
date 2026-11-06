@@ -40,4 +40,17 @@ class VersionsTest {
         assertEquals(2, Versions.pick(versions, -1))
         assertEquals(0, Versions.pick(versions, 0))
     }
+
+    @Test
+    fun `another copy of the same cut resumes where the first stopped`() {
+        val uhd = VersionInfo(2160, "Dolby Vision", true, null, 60_000_000_000)
+        val fhd = VersionInfo(1080, null, false, null, 12_000_000_000)
+        val extended = VersionInfo(1080, null, false, "Extended", 14_000_000_000)
+        val stopped = com.sine.player.data.PlaybackRecord("uhd", "Film", null, 3_600_000, 7_200_000, 100)
+        val records = listOf(stopped, null, null)
+        val versions = listOf(uhd, fhd, extended)
+        org.junit.Assert.assertEquals(stopped, Versions.resumeFrom(1, versions, records))
+        org.junit.Assert.assertNull(Versions.resumeFrom(2, versions, records))
+        org.junit.Assert.assertEquals(stopped, Versions.resumeFrom(0, versions, records))
+    }
 }
