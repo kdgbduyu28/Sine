@@ -44,7 +44,7 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
             year?.let { put("year", it.toString()) }
         }).optJSONArray("results")
         val hit = best(results, year, "release_date") ?: return null
-        val details = get("/movie/${hit.getInt("id")}", mapOf("append_to_response" to "release_dates"))
+        val details = get("/movie/${hit.getInt("id")}", mapOf("append_to_response" to "release_dates,credits"))
         return meta(details, "title", "release_date").copy(certification = AgeRatings.movieCertification(details, region))
     }
 
@@ -55,7 +55,7 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
         }).optJSONArray("results")
         val hit = best(results, year, "first_air_date") ?: return null
         val id = hit.getInt("id")
-        val details = get("/tv/$id", mapOf("append_to_response" to "content_ratings"))
+        val details = get("/tv/$id", mapOf("append_to_response" to "content_ratings,credits"))
         val episodes = HashMap<String, EpisodeMeta>()
         seasons.forEach { season ->
             runCatching {
@@ -110,11 +110,24 @@ class Tmdb(private val key: String, private val language: String = "en-US") {
             year = o.optString(dateField).take(4).toIntOrNull(),
             collection = collection(o),
             originalLanguage = o.optString("original_language").takeIf { it.length in 2..3 },
+            cast = credits(o).first,
+            director = credits(o).second,
         )
     }
 
     companion object {
         private const val API = "https://api.themoviedb.org/3"
+
+        /** Top-billed cast and the director (movies) or creator (shows) from appended credits. */
+        fun credits(o: JSONObject): Pair<List<String>, String?> {
+            val cast = o.optJSONObject("credits")?.optJSONArray("cast") ?: JSONArray()
+            val names = (0 until minOf(cast.length(), 6)).mapNotNull { cast.optJSONObject(it)?.optString("name")?.ifEmpty { null } }
+            val crew = o.optJSONObject("credits")?.optJSONArray("crew") ?: JSONArray()
+            val director = (0 until crew.length()).mapNotNull { crew.optJSONObject(it) }
+                .firstOrNull { it.optString("job") == "Director" }?.optString("name")?.ifEmpty { null }
+                ?: o.optJSONArray("created_by")?.optJSONObject(0)?.optString("name")?.ifEmpty { null }
+            return names to director
+        }
 
         /** `belongs_to_collection` from movie details. */
         fun collection(o: JSONObject): MovieCollection? = o.optJSONObject("belongs_to_collection")?.let { c ->

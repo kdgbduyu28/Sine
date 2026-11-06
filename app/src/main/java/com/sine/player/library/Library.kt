@@ -224,7 +224,7 @@ object Library {
         val month = 30L * 24 * 3_600_000
         store.movies.distinctBy { it.key }.forEach { movie ->
             val existing = store.meta[movie.key]
-            if (!force && existing != null && existing.collectionKnown && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            if (!force && existing != null && existing.collectionKnown && existing.certificationKnown && existing.creditsKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${movie.title}"
             runCatching { tmdb.movie(movie.title, movie.year) }.getOrNull()
                 ?.let { store.putMeta(movie.key, it) }
@@ -239,7 +239,7 @@ object Library {
             // Once the known next episode has aired, look up the one after it (and its details).
             val nextAired = existing?.nextEpisode?.let { it.airDate < com.sine.player.util.Time.today() } == true ||
                 existing?.nextEpisodeKnown == false
-            if (!force && existing != null && !missingSeason && !noAirDates && !nextAired && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
+            if (!force && existing != null && !missingSeason && !noAirDates && !nextAired && existing.creditsKnown && existing.certificationKnown && System.currentTimeMillis() - existing.fetchedAt < month) return@forEach
             scanning = "Getting details: ${show.title}"
             runCatching { tmdb.show(show.title, show.year, show.seasons) }.getOrNull()
                 ?.let { store.putMeta(show.key, it) }

@@ -277,6 +277,17 @@ private fun MissingFromCollection(id: Int, movies: List<Movie>) {
     }
 }
 
+/** "Starring A, B, C · Directed by D" under the overview, when TMDB knows them. */
+@Composable
+private fun Credits(meta: Meta?, directorLabel: String) {
+    val line = listOfNotNull(
+        meta?.cast?.take(4)?.takeIf { it.isNotEmpty() }?.let { "Starring " + it.joinToString(", ") },
+        meta?.director?.let { "$directorLabel $it" },
+    ).joinToString("   ·   ")
+    if (line.isEmpty()) return
+    Text(line, style = MaterialTheme.typography.bodyMedium, color = SineColors.muted, maxLines = 2, modifier = Modifier.padding(top = 8.dp).width(720.dp))
+}
+
 @Composable
 private fun MyListButton(listKey: String) {
     val list = SineApp.instance.myList
@@ -394,6 +405,7 @@ fun MovieDetailScreen(
                 }
             }
             meta?.overview?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = SineColors.text, maxLines = 8, modifier = Modifier.width(720.dp)) }
+            Credits(meta, directorLabel = "Directed by")
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (resumeRecord != null) {
@@ -451,6 +463,7 @@ fun ShowDetailScreen(
                 )
                 Spacer(Modifier.height(16.dp))
                 meta?.overview?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = SineColors.text, maxLines = 7) }
+                Credits(meta, directorLabel = "Created by")
                 Spacer(Modifier.height(24.dp))
                 val nextRecord = resume.get(next.file.uri)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
