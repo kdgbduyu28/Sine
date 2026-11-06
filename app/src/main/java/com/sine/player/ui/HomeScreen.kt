@@ -414,7 +414,15 @@ fun HomeScreen(
                         items(shows.take(20), key = { it.key }) { s ->
                             com.sine.player.library.PosterCard(
                                 library.meta[s.key]?.title ?: s.title,
-                                "${s.episodes.size} episodes",
+                                run {
+                                    // "3 new" reads better than a total once you've started a show.
+                                    val unwatched = s.episodes.count { SineApp.instance.resume.get(it.file.uri)?.watched != true }
+                                    when (unwatched) {
+                                        0 -> "All watched"
+                                        s.episodes.size -> "${s.episodes.size} episodes"
+                                        else -> "$unwatched unwatched"
+                                    }
+                                },
                                 com.sine.player.library.Library.posterFor(s.key, s.localPoster),
                                 onClick = { onShow(s.key) },
                             )
