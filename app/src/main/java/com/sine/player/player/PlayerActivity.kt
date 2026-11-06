@@ -155,7 +155,7 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
             return
         }
         lifecycleScope.launch {
-            val queue = folder?.let { runCatching { buildQueue(it) }.getOrDefault(emptyList()) }.orEmpty().toMutableList()
+            val queue = folder?.let { runCatching { buildQueue(it, uri) }.getOrDefault(emptyList()) }.orEmpty().toMutableList()
             var start = queue.indexOfFirst { it.uri == uri }
             if (start < 0) {
                 // Not in its folder (or no folder): server items still need their stream URL looked up.
@@ -172,15 +172,18 @@ class PlayerActivity : ComponentActivity(), PlayerSession.Host {
         }
     }
 
-    /** Every video in the folder, in the folder's order, each with its subtitles attached. */
-    private suspend fun buildQueue(folder: String): List<PlayItem> {
+    /**
+     * Every video in the folder, in the folder's order, each with its subtitles attached. Release
+     * samples are left out so "next" doesn't play one, unless [opening] is the sample itself.
+     */
+    private suspend fun buildQueue(folder: String, opening: String? = null): List<PlayItem> {
         val entries = Browsers.list(folder)
         val names = if (Browsers.hasSidecars(folder)) entries.filter { !it.isDirectory }.map { it.name } else emptyList()
         // Releases often keep subtitles in Subs/ (films) or Subs/<episode name>/ (shows).
         val subsDir = if (Browsers.hasSidecars(folder)) MediaFiles.subsFolder(entries.filter { it.isDirectory }.map { it.name }) else null
         val subsUri = subsDir?.let { Browsers.child(folder, it) }
         val subsEntries = subsUri?.let { runCatching { Browsers.list(it) }.getOrDefault(emptyList()) }.orEmpty()
-        val videos = entries.filter { it.isVideo }
+        val videos = entries.filter { it.isVideo && (it.uri == opening || !com.sine.player.library.NameParser.isSample(it.name, it.size)) }
         return videos.map { video ->
             val sidecars = MediaFiles.findSidecars(video.name, names).map {
                 PlayerSession.sidecarConfig(Browsers.child(folder, it.fileName), it)
