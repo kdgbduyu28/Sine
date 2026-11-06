@@ -207,7 +207,11 @@ object Library {
             }
         }
         val target = entries.firstOrNull { (it.item as? Movie)?.key == key || (it.item as? Show)?.key == key } ?: return emptyList()
-        return LibraryFilter.similar(target, entries, limit)
+        // Same director (or creator) first, then by shared genres.
+        fun keyOf(e: GridEntry<Any>) = (e.item as? Movie)?.key ?: (e.item as? Show)?.key
+        val director = store.meta[key]?.director
+        val sameDirector = if (director == null) emptyList() else entries.filter { it !== target && keyOf(it) != key && store.meta[keyOf(it)]?.director == director }
+        return (sameDirector + LibraryFilter.similar(target, entries, limit)).distinctBy { keyOf(it) }.take(limit)
     }
 
     /** Looks up TMDB details for anything that doesn't have them yet (needs the user's key). */
