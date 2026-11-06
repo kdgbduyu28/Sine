@@ -33,6 +33,12 @@ object SineSearch {
         return normalize(query).split(' ').filter { it.isNotEmpty() }.all { q -> words.any { it.startsWith(q) } }
     }
 
+    /** The actor or director of [meta] that [query] names ("zendaya", "villeneuve"), if any. */
+    fun person(meta: com.sine.player.library.Meta?, query: String): String? {
+        if (meta == null || normalize(query).length < 3) return null
+        return (meta.cast + listOfNotNull(meta.director)).firstOrNull { matches(it, query) }
+    }
+
     fun search(query: String, limit: Int = 40): List<SearchResult> {
         if (query.isBlank()) return emptyList()
         val app = SineApp.instance
@@ -44,6 +50,10 @@ object SineSearch {
             val title = meta?.title ?: m.title
             if (matches(title, query) || matches(m.title, query)) {
                 results += SearchResult(ResultKind.MOVIE, title, (meta?.year ?: m.year)?.toString(), m.key, m.file.folder, Library.posterFor(m.key, m.localPoster), meta?.year ?: m.year)
+            } else {
+                person(meta, query)?.let { name ->
+                    results += SearchResult(ResultKind.MOVIE, title, listOfNotNull((meta?.year ?: m.year)?.toString(), "with $name").joinToString(" · "), m.key, m.file.folder, Library.posterFor(m.key, m.localPoster), meta?.year ?: m.year)
+                }
             }
         }
         store.shows.filter { profile.allows(it.folder) }.forEach { s ->
@@ -51,6 +61,10 @@ object SineSearch {
             val title = meta?.title ?: s.title
             if (matches(title, query) || matches(s.title, query)) {
                 results += SearchResult(ResultKind.SHOW, title, "${s.episodes.size} episodes", s.key, s.folder, Library.posterFor(s.key, s.localPoster), meta?.year ?: s.year)
+            } else {
+                person(meta, query)?.let { name ->
+                    results += SearchResult(ResultKind.SHOW, title, "with $name", s.key, s.folder, Library.posterFor(s.key, s.localPoster), meta?.year ?: s.year)
+                }
             }
             s.episodes.forEach { e ->
                 val name = meta?.episodes?.get("${e.season}:${e.number}")?.name ?: return@forEach
