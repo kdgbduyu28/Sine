@@ -88,6 +88,7 @@ class PhoneRemote(private val context: Context) {
         if (enabled) start()
     }
 
+    @JvmName("changeEnabled")
     fun setEnabled(on: Boolean) {
         enabled = on
         prefs.edit { putBoolean("enabled", on) }
@@ -123,7 +124,7 @@ class PhoneRemote(private val context: Context) {
         port = 0
     }
 
-    private fun serve(socket: Socket) = socket.use { s ->
+    private fun serve(socket: Socket): Unit = socket.use { s ->
         s.soTimeout = 10_000
         val input = BufferedInputStream(s.getInputStream())
         val requestLine = readLine(input) ?: return

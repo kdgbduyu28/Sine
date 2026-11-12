@@ -163,6 +163,7 @@ class PlayerSession(
     var volumeBoost by mutableIntStateOf(100)
         private set
 
+    @JvmName("changeVolumeBoost")
     fun setVolumeBoost(percent: Int) {
         volumeBoost = percent.coerceIn(100, 200)
         engine?.setVolumeBoost(volumeBoost)

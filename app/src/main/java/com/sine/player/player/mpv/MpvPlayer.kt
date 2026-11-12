@@ -1,6 +1,8 @@
 package com.sine.player.player.mpv
 
 import android.content.Context
+import com.sine.player.player.SubtitleColor
+import com.sine.player.player.SubtitleEdge
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock

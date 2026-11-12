@@ -132,7 +132,10 @@ object Xmltv {
     /** "20261020183000 +0800" (zone optional, UTC assumed; seconds optional). */
     fun parseTime(text: String): Long? {
         val trimmed = text.trim()
-        val digits = trimmed.takeWhile { it.isDigit() }.padEnd(14, '0').take(14)
+        val leading = trimmed.takeWhile { it.isDigit() }
+        // Need at least a full date; otherwise padding turns junk into year 0.
+        if (leading.length < 8) return null
+        val digits = leading.padEnd(14, '0').take(14)
         val zone = trimmed.substringAfter(' ', "").trim()
         return runCatching {
             if (zone.isNotEmpty()) withZone.get()!!.parse("$digits $zone")!!.time else utc.get()!!.parse(digits)!!.time

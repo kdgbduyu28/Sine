@@ -1,3 +1,6 @@
+// WatchNextProgram.Builder inherits its setters from a restricted base class; lint flags every Kotlin call to them.
+@file:SuppressLint("RestrictedApi")
+
 package com.sine.player.library
 
 import android.annotation.SuppressLint
